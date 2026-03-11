@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Profile - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="card">
+    <form method="post">
+        <label>Username</label>
+        <input type="text" name="username" value="{{ g.current_user.username }}" required>
+
+        <label>Current password</label>
+        <input type="password" name="current_password" required>
+
+        <label>New password (leave blank to keep current)</label>
+        <input type="password" name="new_password">
+
+        <label>Confirm new password</label>
+        <input type="password" name="confirm_password">
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.75rem;">
+            <button type="submit" class="btn btn-primary">Save changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

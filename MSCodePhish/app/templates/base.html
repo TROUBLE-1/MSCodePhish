@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Device Code Phishing Toolkit{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/mscodephish_logo.png') }}">
+</head>
+<body>
+    {% set is_auth_page = request.endpoint in ['main.login', 'main.change_password'] %}
+    {% if not is_auth_page %}
+    <nav class="sidebar">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='images/mscodephish_logo.png') }}" alt="MSCodePhish logo">
+        </div>
+        <ul>
+            <li>
+                <a href="{{ url_for('main.dashboard') }}"
+                   class="{% if request.endpoint == 'main.dashboard' %}active{% endif %}">
+                    <span class="nav-icon">⌂</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('main.smtp_list') }}"
+                   class="{% if request.endpoint.startswith('main.smtp_') %}active{% endif %}">
+                    <span class="nav-icon">✉</span>
+                    <span class="nav-label">SMTP Config</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('main.notifications') }}"
+                   class="{% if request.endpoint == 'main.notifications' %}active{% endif %}">
+                    <span class="nav-icon">!</span>
+                    <span class="nav-label">Notifications</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('main.azure_list') }}"
+                   class="{% if request.endpoint.startswith('main.azure_') %}active{% endif %}">
+                    <span class="nav-icon">☁</span>
+                    <span class="nav-label">Azure App / SP</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('main.campaign_list') }}"
+                   class="{% if request.endpoint.startswith('main.campaign_') %}active{% endif %}">
+                    <span class="nav-icon">◎</span>
+                    <span class="nav-label">Campaigns</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('main.token_list') }}"
+                   class="{% if request.endpoint.startswith('main.token_') %}active{% endif %}">
+                    <span class="nav-icon">⭘</span>
+                    <span class="nav-label">Captured Tokens</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+
+    <main class="content {% if is_auth_page %}auth-content{% endif %}">
+        {% if not is_auth_page %}
+        {% set page_title =
+            'Dashboard' if request.endpoint == 'main.dashboard' else
+            'SMTP Config' if request.endpoint.startswith('main.smtp_') else
+            'Notifications' if request.endpoint == 'main.notifications' else
+            'Azure App / SP' if request.endpoint.startswith('main.azure_') else
+            'Campaigns' if request.endpoint.startswith('main.campaign_') else
+            'Captured Tokens' if request.endpoint.startswith('main.token_') else
+            'Profile' if request.endpoint == 'main.profile' else
+            'MSCodePhish'
+        %}
+        <header class="top-nav">
+            <div class="top-nav-left">
+                <span class="top-nav-title">{{ page_title }}</span>
+            </div>
+            <div class="top-nav-right">
+                {% if g.current_user %}
+                <div class="profile-menu" id="profile-menu">
+                    <button type="button" class="profile-trigger" id="profile-trigger">
+                        <span class="profile-avatar">
+                            {{ g.current_user.username[:1]|upper }}
+                        </span>
+                        <span class="profile-caret">▾</span>
+                    </button>
+                    <div class="profile-dropdown" id="profile-dropdown">
+                        <a href="{{ url_for('main.profile') }}">
+                            <span class="profile-item-icon">✎</span>
+                            <span>Edit profile</span>
+                        </a>
+                        <a href="{{ url_for('main.logout') }}" class="profile-logout">
+                            <span class="profile-item-icon">⏻</span>
+                            <span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </header>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages{% if is_auth_page %} auth-flash{% endif %}">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-8i+wGkVfdLlNUovOwZlFGMPR8ew9FHQ+UTLXQqNt5kL/5S3NObCR1zQ3AAtF7wZ1" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

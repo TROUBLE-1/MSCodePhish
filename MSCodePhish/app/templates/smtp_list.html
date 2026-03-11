@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}SMTP Config - Device Code Phishing{% endblock %}
+{% block content %}
+<p class="mb-2"><a href="{{ url_for('main.smtp_new') }}" class="btn btn-primary">Add SMTP</a></p>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Host</th>
+                <th>Port</th>
+                <th>From</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in configs %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td>{{ c.host }}</td>
+                <td>{{ c.port }}</td>
+                <td>{{ c.from_email }}</td>
+                <td>{{ 'Yes' if c.is_active else 'No' }}</td>
+                <td>
+                    <a href="{{ url_for('main.smtp_edit', id=c.id) }}" class="btn btn-sm">Edit</a>
+                    <form action="{{ url_for('main.smtp_delete', id=c.id) }}" method="post" style="display:inline;" class="smtp-delete-form">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No SMTP configs. <a href="{{ url_for('main.smtp_new') }}">Add one</a>.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var forms = document.querySelectorAll('.smtp-delete-form');
+    if (!forms.length) return;    forms.forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var msg = 'Delete this SMTP config?';
+            function doDelete() { form.submit(); }
+            if (window._dc_openConfirm) {
+                window._dc_openConfirm(msg, doDelete);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

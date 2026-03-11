@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if config else 'New' }} Azure App - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="card">
+    <form method="post">
+        <label>Name</label>
+        <input type="text" name="name" value="{{ config.name if config else 'default' }}" placeholder="default">
+        <label>Client ID (Application ID)</label>
+        <input type="text" name="client_id" value="{{ config.client_id if config else '' }}" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+        <label>Client Secret (optional, for confidential clients)</label>
+        <input type="password" name="client_secret" value="" placeholder="{{ 'Leave blank to keep current' if config else '' }}">
+        <label>Tenant ID</label>
+        <input type="text" name="tenant_id" value="{{ config.tenant_id if config else 'common' }}" placeholder="common or your-tenant-id">
+        <label>Scope (space-separated)</label>
+        <input type="text" name="scope" value="{{ config.scope if config else 'openid profile email User.Read offline_access' }}" placeholder="openid profile email User.Read offline_access">
+        <br>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{{ url_for('main.azure_list') }}" class="btn">Cancel</a>
+    </form>
+</div>
+{% endblock %}
