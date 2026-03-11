@@ -12,7 +12,7 @@ Use only for red teaming / penetration testing with explicit written authorizati
 
 ---
 
-https://github.com/user-attachments/assets/efbec0b9-a093-4c9f-9b46-a3e2a3e66ccc
+https://github.com/user-attachments/assets/0b6a9d0a-e6f3-4518-a4b8-de81f3dbc1bb
 
 ## Features
 
@@ -184,3 +184,4 @@ You are responsible for complying with all applicable laws, contracts, and organ
 ## Legal
 
 Use only where you have explicit authorization to conduct phishing and token capture (e.g. internal red team, authorized pentest). Unauthorized use may be illegal.
+
