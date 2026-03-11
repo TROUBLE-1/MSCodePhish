@@ -4,11 +4,9 @@
    <img src="MSCodePhish/app/static/images/mscodephish_logo.png" width="300px" alt="ROADtools logo" />
 </p>
 
-Flask-based offensive web application for **authorized** Microsoft Device Code phishing (OAuth 2.0 Device Authorization Grant).  
-
-It lets you spin up realistic campaigns where targets enter a legitimate device code on `microsoft.com/devicelogin`, while you quietly capture the resulting OAuth tokens for Microsoft 365 (Graph, Exchange, SharePoint, Teams, etc.).  
-This models modern real‑world attacks used by red teams and threat actors to bypass MFA and gain long‑lived cloud access using only the device code flow.  
-Use only for red teaming / penetration testing with explicit written authorization.
+MSCodePhish is a red‑team toolkit that turns Microsoft’s Device Code OAuth flow into an embeddable phishing primitive that works inside any lure (e.g., “grab your coupon,” “unlock access,” etc.). Instead of pre‑generating device codes and racing against the usual 15‑minute timeout, MSCodePhish exposes a simple API endpoint that phishing pages can call via JavaScript (XHR/fetch) at the exact moment a victim opens the page. The tool then generates a fresh device code on demand, returns it to the phishing page (e.g., rendered as a “coupon code”), and instructs the user to complete the login on the legitimate Microsoft device login portal using that code.
+Behind the scenes, MSCodePhish continuously polls Microsoft’s token endpoint for that device code and, once the victim finishes authentication, captures the resulting refresh token and related claims (tenant, user, etc.). From its web UI, operators can track active campaigns, monitor which lures are converting, and use captured refresh tokens to request new access tokens for different resources (ARM, Key Vault, Graph, Storage, or custom scopes) in real time. Because the code is generated only when the phishing HTML is actually loaded, MSCodePhish effectively sidesteps device‑code expiration issues and enables more realistic, flexible phishing flows that closely mimic benign “promo code” or “access code” UX patterns.
+The framework is aimed at offensive security teams and researchers who want to test how easily users can be manipulated into completing the device code flow on a legitimate Microsoft page, and to demonstrate the downstream impact of a single successful device‑code phish in modern Azure/M365 environments.
 
 ---
 
@@ -184,4 +182,5 @@ You are responsible for complying with all applicable laws, contracts, and organ
 ## Legal
 
 Use only where you have explicit authorization to conduct phishing and token capture (e.g. internal red team, authorized pentest). Unauthorized use may be illegal.
+
 
