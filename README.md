@@ -11,8 +11,11 @@ Behind the scenes, MSCodePhish continuously polls Microsoft’s token endpoint f
 The framework is aimed at offensive security teams and researchers who want to test how easily users can be manipulated into completing the device code flow on a legitimate Microsoft page, and to demonstrate the downstream impact of a single successful device‑code phish in modern Azure/M365 environments.
 
 ---
-
 https://github.com/user-attachments/assets/0b6a9d0a-e6f3-4518-a4b8-de81f3dbc1bb
+
+## Phishing Walkthrough (DEMO)
+https://github.com/user-attachments/assets/998d1c69-0fc9-4c05-b25c-48d2b50a818e
+
 
 ## Features
 
