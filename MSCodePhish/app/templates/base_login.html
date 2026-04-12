@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Login - Device Code Phishing{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/mscodephish_logo.png') }}">
+</head>
+<body class="auth-body">
+    <main class="content auth-content">
+        <div style="width:100%; max-width:420px;">
+            <div class="auth-logo">
+                <img src="{{ url_for('static', filename='images/mscodephish_logo.png') }}"
+                     alt="MSCodePhish logo">
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages auth-flash">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</body>
+</html>
+

@@ -1,0 +1,16 @@
+{% extends "base_login.html" %}
+{% block title %}Login - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="card auth-card">
+    <h1 style="margin-top:0; margin-bottom:0.75rem; font-size:1.3rem; text-align:center;">Sign in</h1>
+    <form method="post">
+        <label>Username</label>
+        <input type="text" name="username" value="{{ request.form.username or '' }}" required>
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <div style="display:flex; justify-content:flex-end; margin-top:0.75rem;">
+            <button type="submit" class="btn btn-primary">Login</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

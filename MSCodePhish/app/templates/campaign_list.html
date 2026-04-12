@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Campaigns - Device Code Phishing{% endblock %}
+{% block content %}
+<p class="mb-2"><a href="{{ url_for('main.campaign_new') }}" class="btn btn-primary">New Campaign</a></p>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Total sessions</th>
+                <th>Pending</th>
+                <th>Authorized</th>
+                <th>Error / other</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in campaigns_with_status %}
+            {% set c = row.campaign %}
+            <tr>
+                <td>{{ c.name or 'Unnamed' }}</td>
+                <td><span class="badge badge-{{ row.ui_status }}">{{ row.ui_status }}</span></td>
+                <td>{{ row.total_sessions }}</td>
+                <td>{{ row.pending_sessions }}</td>
+                <td>{{ row.authorized_sessions }}</td>
+                <td>{{ row.error_sessions }}</td>
+                <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
+                <td>
+                    <a href="{{ url_for('main.campaign_detail', id=c.id) }}" class="btn btn-sm">View</a>
+                    <a href="{{ url_for('main.campaign_edit', id=c.id) }}" class="btn btn-sm">Edit</a>
+                    <form action="{{ url_for('main.campaign_delete', id=c.id) }}" method="post" style="display:inline;" class="campaign-delete-form">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No campaigns. <a href="{{ url_for('main.campaign_new') }}">Create one</a>.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    // Live updates from background polling / API
+    if (window._dc_socket) {
+        var socket = window._dc_socket;
+        socket.on('campaign_updated', function () {
+            // Reload the list so status and session counts stay in sync.
+            window.location.reload();
+        });
+    }
+
+    // Styled confirm popup for deleting campaigns, reusing global helper if available
+    var forms = document.querySelectorAll('.campaign-delete-form');
+    if (!forms.length) return;
+
+    forms.forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var msg = 'Delete this campaign and all its sessions and captured tokens? This cannot be undone.';
+            function doDelete() {
+                form.submit();
+            }
+            if (window._dc_openConfirm) {
+                window._dc_openConfirm(msg, doDelete);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

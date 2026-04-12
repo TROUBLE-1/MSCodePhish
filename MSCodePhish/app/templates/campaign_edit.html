@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if campaign else 'New' }} Campaign - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="card">
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form method="post">
+        <div style="display:flex; flex-wrap:wrap; gap:2rem; align-items:flex-start;">
+            <div style="flex:1 1 380px; min-width:320px;">
+                <label>Campaign name</label>
+                <input type="text" name="name" value="{{ campaign.name if campaign else '' }}" placeholder="e.g. Q1 Phish Test">
+                <label>Device code flow: Microsoft public client</label>
+                <p class="label-hint" style="font-size:0.85rem; margin-top:0.25rem; margin-bottom:0.25rem;">
+                    Choose which public <code>client_id</code> to use for the device code flow, or provide your own.
+                </p>
+                {% set current_public = campaign.public_client_id if campaign else '' %}
+                <input type="text"
+                       name="public_client_id"
+                       value="{{ current_public }}"
+                       placeholder="Public client_id (e.g. Azure CLI / PowerShell / custom)"
+                       style="max-width:383px;">
+                <div style="font-size:0.85rem;">
+                    <span style="font-weight:600; margin-right:0.5rem;">Quick picks:</span>
+                    <button type="button"
+                            class="btn btn-sm"
+                            onclick="document.querySelector('input[name=&quot;public_client_id&quot;]').value='14d82eec-204b-4c2f-b7e8-296a70dab67e';">
+                        Azure CLI
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm"
+                            onclick="document.querySelector('input[name=&quot;public_client_id&quot;]').value='1950a258-227b-4e31-a9cf-717495945fc2';">
+                        PowerShell
+                    </button>
+                </div>
+            </div>
+
+            <div style="flex:1 1 380px; min-width:320px;">
+                <h2 class="mb-2">Email delivery</h2>
+                <div class="email-delivery-options mb-2">
+                    <label class="radio-label">
+                        <input type="radio" name="email_delivery_method" value="none" {{ 'checked' if not campaign or (campaign.email_delivery_method or 'none') == 'none' else '' }}> Do not send email
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="email_delivery_method" value="smtp" {{ 'checked' if campaign and campaign.email_delivery_method == 'smtp' else '' }}> Use SMTP
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="email_delivery_method" value="azure" {{ 'checked' if campaign and campaign.email_delivery_method == 'azure' else '' }}> Use Azure App / Service Principal (Graph)
+                    </label>
+                </div>
+
+                <div id="email-smtp-block" class="email-delivery-block" style="display: none;">
+                    <label>SMTP config</label>
+                    <select name="smtp_config_id">
+                        <option value="">-- Select SMTP --</option>
+                        {% for s in smtp_configs %}
+                        <option value="{{ s.id }}" {{ 'selected' if campaign and campaign.smtp_config_id == s.id else '' }}>{{ s.name }} ({{ s.from_email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div id="email-azure-block" class="email-delivery-block" style="display: none;">
+                    <label>Azure App for sending email (must have Mail.Send and client secret)</label>
+                    <select name="azure_email_config_id">
+                        <option value="">-- Select Azure App --</option>
+                        {% for a in azure_configs %}
+                        <option value="{{ a.id }}" {{ 'selected' if campaign and campaign.azure_email_config_id == a.id else '' }}>{{ a.name }} ({{ a.client_id[:16] }}...)</option>
+                        {% endfor %}
+                    </select>
+                    <label>Send from (user UPN or object ID)</label>
+                    <input type="text" name="azure_email_from" value="{{ campaign.azure_email_from if campaign else '' }}" placeholder="user@tenant.com or object-id">
+                </div>
+            </div>
+        </div>
+        <hr class="section-divider">
+
+        <label>Email subject (placeholders: {% raw %}{{user_code}}{% endraw %})</label>
+        <input type="text" name="email_subject" value="{{ campaign.email_subject if campaign else 'Sign in to your account' }}" placeholder="Sign in to your account">
+        <label>Email body (HTML). Placeholders: {% raw %}{{user_code}}{% endraw %}, {% raw %}{{verification_uri}}{% endraw %}. <br>
+        Device Code login URL: https://login.microsoft.com/device</label>
+        <textarea name="email_body_html" rows="16" style="width:100%; max-width:900px; min-height:260px;">{{ campaign.email_body_html if campaign else default_email_body }}</textarea>
+        <br>
+        <button type="submit" class="btn btn-primary">Save</button>
+        {% if campaign %}
+        <a href="{{ url_for('main.campaign_detail', id=campaign.id) }}" class="btn">View campaign</a>
+        {% else %}
+        <a href="{{ url_for('main.campaign_list') }}" class="btn">Cancel</a>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var radios = document.querySelectorAll('input[name="email_delivery_method"]');
+    var smtpBlock = document.getElementById('email-smtp-block');
+    var azureBlock = document.getElementById('email-azure-block');
+    function showBlocks() {
+        var v = document.querySelector('input[name="email_delivery_method"]:checked');
+        v = v ? v.value : 'none';
+        smtpBlock.style.display = v === 'smtp' ? 'block' : 'none';
+        azureBlock.style.display = v === 'azure' ? 'block' : 'none';
+    }
+    radios.forEach(function (r) { r.addEventListener('change', showBlocks); });
+    showBlocks();
+})();
+</script>
+{% endblock %}

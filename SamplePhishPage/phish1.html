@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Licensing resources</title>
+  <style>
+    :root {
+      --ms-blue: #0078d4;
+      --ms-blue-hover: #106ebe;
+      --ms-link: #0067b8;
+      --ink: #000;
+      --text: #242424;
+      --muted: #616161;
+      --muted-light: #757575;
+      --border: #e0e0e0;
+      --surface: #fff;
+      --wash: #f2f2f2;
+      --wash-deep: #ebebeb;
+      --hero-bg: linear-gradient(135deg, #0e3a5c 0%, #0a2840 45%, #061a2e 100%);
+      --shadow-sm: 0 0.5px 1.6px rgba(0, 0, 0, 0.1);
+      --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
+      --radius: 8px;
+      --max: 1600px;
+      --gutter: clamp(1rem, 4vw, 2.5rem);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Segoe UI Web (West European)", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 1rem;
+      line-height: 1.5;
+      color: var(--text);
+      background: var(--surface);
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      z-index: 9999;
+      padding: 0.75rem 1rem;
+      background: var(--ms-blue);
+      color: #fff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .skip-link:focus {
+      left: var(--gutter);
+      top: 0.5rem;
+    }
+
+    .prototype-banner {
+      background: #fff8e6;
+      color: #242424;
+      text-align: center;
+      padding: 0.625rem 1rem;
+      font-size: 0.8125rem;
+      border-bottom: 1px solid #ede6d6;
+    }
+
+    .utility-bar {
+      background: #f2f2f2;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+    }
+
+    .utility-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0.35rem var(--gutter);
+      display: flex;
+      justify-content: flex-end;
+      gap: 1.25rem;
+      color: var(--muted);
+    }
+
+    .utility-inner a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .utility-inner a:hover {
+      text-decoration: underline;
+      color: var(--ink);
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-row {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0.75rem var(--gutter);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    .wordmark svg {
+      width: 108px;
+      height: 23px;
+      flex-shrink: 0;
+    }
+
+    .wordmark-badge {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      padding: 0.2rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--wash);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+
+    .nav-rail {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .nav-rail-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 var(--gutter);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+
+    .nav-rail ul {
+      display: flex;
+      gap: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      white-space: nowrap;
+    }
+
+    .nav-rail li {
+      border-bottom: 3px solid transparent;
+    }
+
+    .nav-rail li.is-active {
+      border-bottom-color: var(--ink);
+    }
+
+    .nav-rail a {
+      display: block;
+      padding: 0.85rem 1rem;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    .nav-rail a:hover {
+      background: var(--wash);
+    }
+
+    .hero {
+      background: var(--hero-bg);
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 70% 20%, rgba(0, 120, 212, 0.25), transparent 55%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: clamp(2.5rem, 6vw, 4.5rem) var(--gutter) clamp(3rem, 7vw, 5rem);
+    }
+
+    .hero h1 {
+      margin: 0 0 1rem;
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      max-width: 20ch;
+    }
+
+    .hero p {
+      margin: 0 0 1.75rem;
+      font-size: clamp(1rem, 1.35vw, 1.125rem);
+      line-height: 1.6;
+      max-width: 52ch;
+      opacity: 0.92;
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 1.25rem;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      border-radius: 2px;
+      cursor: pointer;
+      text-decoration: none;
+      border: 2px solid transparent;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .btn-hero-primary {
+      background: #fff;
+      color: var(--ink);
+      border-color: #fff;
+    }
+
+    .btn-hero-primary:hover {
+      background: var(--wash-deep);
+      border-color: var(--wash-deep);
+    }
+
+    .btn-hero-outline {
+      background: transparent;
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.85);
+    }
+
+    .btn-hero-outline:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .anchor-strip {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .anchor-strip-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0.75rem var(--gutter);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+      font-size: 0.8125rem;
+    }
+
+    .anchor-strip a {
+      color: var(--ms-link);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .anchor-strip a:hover {
+      text-decoration: underline;
+    }
+
+    .band {
+      padding: clamp(2.5rem, 5vw, 4rem) 0;
+    }
+
+    .band--wash {
+      background: var(--wash);
+    }
+
+    .band-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 var(--gutter);
+    }
+
+    .eyebrow {
+      margin: 0 0 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .section-head {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.5rem, 2.5vw, 2rem);
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+
+    .section-lead {
+      margin: 0 0 2rem;
+      max-width: 65ch;
+      color: var(--muted);
+      font-size: 1.0625rem;
+    }
+
+    .news-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .news-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .news-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .news-card-visual {
+      height: 140px;
+      background: linear-gradient(145deg, #0078d4 0%, #004578 100%);
+      position: relative;
+    }
+
+    .news-card-visual.alt-a {
+      background: linear-gradient(145deg, #8764b8 0%, #5c2d91 100%);
+    }
+
+    .news-card-visual.alt-b {
+      background: linear-gradient(145deg, #107c10 0%, #0b5a0b 100%);
+    }
+
+    .news-card-body {
+      padding: 1.25rem 1.25rem 1.5rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .news-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.0625rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--ink);
+    }
+
+    .news-card p {
+      margin: 0 0 1rem;
+      font-size: 0.875rem;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .link-arrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--ms-link);
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-decoration: none;
+      margin-top: auto;
+    }
+
+    .link-arrow:hover {
+      text-decoration: underline;
+    }
+
+    .link-arrow::after {
+      content: "→";
+      font-size: 1rem;
+    }
+
+    .two-col-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .info-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .info-card p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .info-card .meta {
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--ms-link);
+      font-weight: 600;
+    }
+
+    .license-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+
+    .license-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .license-card .badge {
+      display: inline-block;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.45rem;
+      border-radius: 2px;
+      background: var(--wash-deep);
+      color: var(--muted);
+      margin-bottom: 0.65rem;
+    }
+
+    .license-card .badge.on {
+      background: #dff6dd;
+      color: #107c10;
+    }
+
+    .license-card h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .license-card .sku {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 0.75rem;
+      color: var(--muted-light);
+      margin-bottom: 0.5rem;
+    }
+
+    .license-card p {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+
+    .offer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .offer-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .offer-card-top {
+      height: 4px;
+      background: linear-gradient(90deg, var(--ms-blue), #00bcf2);
+    }
+
+    .offer-card-inner {
+      padding: 1.5rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .offer-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .offer-card p {
+      margin: 0 0 1.25rem;
+      font-size: 0.875rem;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .btn-primary {
+      background: var(--ms-blue);
+      color: #fff;
+      border: none;
+      border-radius: 2px;
+      align-self: flex-start;
+    }
+
+    .btn-primary:hover {
+      background: var(--ms-blue-hover);
+    }
+
+    .btn-primary:focus-visible {
+      outline: 2px solid var(--ms-blue);
+      outline-offset: 2px;
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .step-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .step-card p {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      font-size: 0.9375rem;
+    }
+
+    .tabs {
+      margin-top: 1.5rem;
+    }
+
+    .tab-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 0.75rem 1.25rem;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .tab-btn:hover {
+      color: var(--ink);
+    }
+
+    .tab-btn[aria-selected="true"] {
+      color: var(--ink);
+      border-bottom-color: var(--ink);
+    }
+
+    .tab-panel[hidden] {
+      display: none;
+    }
+
+    .product-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .product-links a {
+      display: block;
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: var(--ms-link);
+      font-weight: 600;
+      font-size: 0.9375rem;
+    }
+
+    .product-links a:hover {
+      background: var(--wash);
+      border-color: #c8c8c8;
+    }
+
+    .site-footer {
+      background: var(--wash);
+      border-top: 1px solid var(--border);
+      padding: 2rem var(--gutter);
+      margin-top: 2rem;
+    }
+
+    .site-footer-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 2000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      transform: translateY(8px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-backdrop.open .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-header {
+      padding: 1.5rem 1.5rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 1.375rem;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: var(--wash);
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 4px;
+      font-size: 1.25rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+
+    .modal-close:hover {
+      background: var(--wash-deep);
+    }
+
+    .modal-body {
+      padding: 0.75rem 1.5rem 1.5rem;
+    }
+
+    .code-box {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      background: var(--wash);
+      border: 1px dashed var(--border);
+      padding: 1.125rem;
+      border-radius: 4px;
+      text-align: center;
+      word-break: break-all;
+      color: var(--ms-blue-hover);
+      margin: 0.5rem 0 0;
+    }
+
+    .code-box.is-loading {
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: normal;
+    }
+
+    .code-box.is-error {
+      color: #a4262c;
+      border-color: #f1aeb5;
+      background: #fdf3f4;
+    }
+
+    .modal-actions {
+      margin-top: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .modal-claim-btn {
+      width: 100%;
+      min-height: 40px;
+      padding: 0.5rem 1rem;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      border-radius: 2px;
+      cursor: pointer;
+      border: none;
+      background: var(--ms-blue);
+      color: #fff;
+      transition: background 0.12s ease;
+    }
+
+    .modal-claim-btn:hover:not(:disabled) {
+      background: var(--ms-blue-hover);
+    }
+
+    .modal-claim-btn:focus-visible {
+      outline: 2px solid var(--ms-blue);
+      outline-offset: 2px;
+    }
+
+    .modal-claim-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.btn-primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <div class="utility-bar">
+    <div class="utility-inner">
+      <a href="#main">Support</a>
+      <span>English (United States)</span>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="header-row">
+      <a class="wordmark" href="#main" aria-label="Microsoft   home">
+        <!-- Simplified four-square mark + word (geometric, not official asset) -->
+        <svg viewBox="0 0 108 23" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <rect width="10.5" height="10.5" fill="#f25022" />
+          <rect x="12.5" width="10.5" height="10.5" fill="#7fba00" />
+          <rect y="12.5" width="10.5" height="10.5" fill="#00a4ef" />
+          <rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#ffb900" />
+          <text x="28" y="16" fill="#262626" font-size="14" font-family="Segoe UI, sans-serif" font-weight="600">Microsoft</text>
+        </svg>
+        <span class="wordmark-badge">Licensing</span>
+      </a>
+      <div class="header-actions">
+        <span>All Microsoft</span>
+        <span style="opacity:0.5">|</span>
+        <span>Search</span>
+      </div>
+    </div>
+    <nav class="nav-rail" aria-label="Product licensing">
+      <div class="nav-rail-inner">
+        <ul>
+          <li class="is-active"><a href="#main">Microsoft Licensing</a></li>
+          <li><a href="#learn">Azure</a></li>
+          <li><a href="#learn">Dynamics 365</a></li>
+          <li><a href="#licenses">Microsoft 365</a></li>
+          <li><a href="#products">Power Platform</a></li>
+          <li><a href="#offers">Offers</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-inner">
+      <h1 id="hero-title">Understand, choose, and manage your Microsoft licenses</h1>
+      <p>
+        Explore resources to understand your options, compare programs, and manage volume licenses mirroring the structure of the
+        public licensing hub for layout review.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-hero-primary" href="#licenses">Manage your licenses</a>
+        <a class="btn btn-hero-outline" href="#learn">Review product terms</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="anchor-strip">
+    <div class="anchor-strip-inner">
+      <a href="#news">Featured news</a>
+      <a href="#learn">Learn about licensing</a>
+      <a href="#mca">Microsoft Customer Agreement</a>
+      <a href="#licenses">License management</a>
+      <a href="#products">Products</a>
+      <a href="#next">Take the next step</a>
+    </div>
+  </div>
+
+  <main id="main">
+    <section id="news" class="band band--wash" aria-labelledby="news-title">
+      <div class="band-inner">
+        <p class="eyebrow">Featured news</p>
+        <h2 id="news-title" class="section-head">What’s new</h2>
+        <p class="section-lead">Highlights styled like announcement cards on the licensing site use for news; promotional codes are in the offers section below.</p>
+        <div class="news-grid">
+          <article class="news-card">
+            <div class="news-card-visual" aria-hidden="true"></div>
+            <div class="news-card-body">
+              <h3>Pricing and packaging updates for Microsoft 365 and Teams</h3>
+              <p>Illustrative card for packaging and roadmap communications.</p>
+              <a class="link-arrow" href="#offers">Learn more</a>
+            </div>
+          </article>
+          <article class="news-card">
+            <div class="news-card-visual alt-a" aria-hidden="true"></div>
+            <div class="news-card-body">
+              <h3>Important update to Power BI Premium licensing</h3>
+              <p>Placeholder summary for BI licensing changes.</p>
+              <a class="link-arrow" href="#products">Learn more</a>
+            </div>
+          </article>
+          <article class="news-card">
+            <div class="news-card-visual alt-b" aria-hidden="true"></div>
+            <div class="news-card-body">
+              <h3>Buying and managing your Microsoft Customer Agreement</h3>
+              <p>MCA overview for enterprise purchasing workflows.</p>
+              <a class="link-arrow" href="#mca">Learn more</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="learn" class="band" aria-labelledby="learn-title">
+      <div class="band-inner">
+        <p class="eyebrow">Learn about licensing</p>
+        <h2 id="learn-title" class="section-head">Stay informed</h2>
+        <p class="section-lead">Whether you are new to licensing or need program-specific guidance grouped like audience tiles on the reference page.</p>
+        <div class="two-col-cards">
+          <div class="info-card">
+            <h3>Enterprise</h3>
+            <p>Enterprise Agreement, licensing documents, and forms.</p>
+            <p class="meta">Licensing documents →</p>
+          </div>
+          <div class="info-card">
+            <h3>Small business</h3>
+            <p>Open programs, documents, and licensing terms.</p>
+            <p class="meta">Licensing terms →</p>
+          </div>
+          <div class="info-card">
+            <h3>Government &amp; education</h3>
+            <p>Industry licensing options and compliance resources.</p>
+            <p class="meta">Learn more →</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="mca" class="band band--wash" aria-labelledby="mca-title">
+      <div class="band-inner">
+        <p class="eyebrow">Microsoft Customer Agreement</p>
+        <h2 id="mca-title" class="section-head">Streamlined, flexible purchasing</h2>
+        <p class="section-lead">A single agreement that streamlines purchase and click-to-accept online layout only for this prototype.</p>
+        <a class="btn btn-primary" href="#next" style="text-decoration: none; color: #fff;">Learn more</a>
+      </div>
+    </section>
+
+    <section id="licenses" class="band" aria-labelledby="licenses-title">
+      <div class="band-inner">
+        <p class="eyebrow">License management</p>
+        <h2 id="licenses-title" class="section-head">Key resources for existing customers</h2>
+        <p class="section-lead">Production experiences use Microsoft 365 admin center, Azure portal, and VLSC not this static page.</p>
+        <div class="license-grid">
+          <article class="license-card">
+            <span class="badge on">Active</span>
+            <h3>Microsoft 365 E5</h3>
+            <div class="sku">ENTERPRISEPREMIUM</div>
+            <p>Security, compliance, voice, and analytics.</p>
+          </article>
+          <article class="license-card">
+            <span class="badge on">Active</span>
+            <h3>Microsoft 365 E3</h3>
+            <div class="sku">ENTERPRISEPACK</div>
+            <p>Core productivity and collaboration.</p>
+          </article>
+          <article class="license-card">
+            <span class="badge">Available</span>
+            <h3>Power BI Pro</h3>
+            <div class="sku">POWER_BI_PRO</div>
+            <p>Self-service BI per user.</p>
+          </article>
+          <article class="license-card">
+            <span class="badge on">Active</span>
+            <h3>Visio Plan 2</h3>
+            <div class="sku">VISIOCLIENT</div>
+            <p>Web and desktop diagramming.</p>
+          </article>
+          <article class="license-card">
+            <span class="badge">Trial</span>
+            <h3>Defender for Cloud Apps</h3>
+            <div class="sku">MCAS_D</div>
+            <p>SaaS security posture management.</p>
+          </article>
+          <article class="license-card">
+            <span class="badge on">Active</span>
+            <h3>Microsoft Entra ID P2</h3>
+            <div class="sku">AAD_PREMIUM_P2</div>
+            <p>Identity protection and access reviews.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="offers" class="band band--wash" aria-labelledby="offers-title">
+      <div class="band-inner">
+        <p class="eyebrow">Promotional offers</p>
+        <h2 id="offers-title" class="section-head">Limited-time offers</h2>
+        <p class="section-lead">Click <strong>Get offer code</strong> to open a dialog with a reference code.</p>
+        <div class="offer-grid">
+          <article class="offer-card">
+            <div class="offer-card-top"></div>
+            <div class="offer-card-inner">
+              <h3>Annual commit 10% add-on credit</h3>
+              <p>Illustrative offer for net-new seats on qualifying SKUs.</p>
+              <button type="button" class="btn btn-primary js-offer" data-offer="Annual commit credit">Get offer code</button>
+            </div>
+          </article>
+          <article class="offer-card">
+            <div class="offer-card-top"></div>
+            <div class="offer-card-inner">
+              <h3>Teams Phone pilot bundle</h3>
+              <p>Bundle pricing for voice-enabled Teams rollout.</p>
+              <button type="button" class="btn btn-primary js-offer" data-offer="Teams Phone pilot">Get offer code</button>
+            </div>
+          </article>
+          <article class="offer-card">
+            <div class="offer-card-top"></div>
+            <div class="offer-card-inner">
+              <h3>Security SKUs uplift promo</h3>
+              <p>Co-term uplift on Defender stack</p>
+              <button type="button" class="btn btn-primary js-offer" data-offer="Security uplift">Get offer code</button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="products" class="band" aria-labelledby="products-title">
+      <div class="band-inner">
+        <p class="eyebrow">Products</p>
+        <h2 id="products-title" class="section-head">Products and solutions</h2>
+        <p class="section-lead">Tabbed area similar to “Cloud applications / Windows solutions / Licensing information” on the reference hub.</p>
+        <div class="tabs">
+          <div class="tab-list" role="tablist" aria-label="Product categories">
+            <button type="button" class="tab-btn" role="tab" aria-selected="true" aria-controls="panel-cloud" id="tab-cloud">Cloud applications</button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-windows" id="tab-windows">Windows solutions</button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-info" id="tab-info">Licensing information</button>
+          </div>
+          <div id="panel-cloud" class="tab-panel" role="tabpanel" aria-labelledby="tab-cloud">
+            <div class="product-links">
+              <a href="#">Azure</a>
+              <a href="#">Dynamics 365</a>
+              <a href="#">Microsoft 365</a>
+              <a href="#">Microsoft Teams</a>
+              <a href="#">Power Platform</a>
+              <a href="#">SQL Server</a>
+            </div>
+          </div>
+          <div id="panel-windows" class="tab-panel" role="tabpanel" aria-labelledby="tab-windows" hidden>
+            <div class="product-links">
+              <a href="#">Windows 11</a>
+              <a href="#">Windows 365</a>
+              <a href="#">Windows Server</a>
+              <a href="#">System Center</a>
+            </div>
+          </div>
+          <div id="panel-info" class="tab-panel" role="tabpanel" aria-labelledby="tab-info" hidden>
+            <div class="product-links">
+              <a href="#">Licensing briefs</a>
+              <a href="#">Licensing terms</a>
+              <a href="#">Product licensing search</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="next" class="band band--wash" aria-labelledby="next-title">
+      <div class="band-inner">
+        <h2 id="next-title" class="section-head">Take the next step</h2>
+        <p class="section-lead">Three pathways often shown on the licensing landing page.</p>
+        <div class="step-grid">
+          <div class="step-card">
+            <h3>Buy from a partner</h3>
+            <p>CSP and partner-managed solutions for digital transformation.</p>
+            <a class="link-arrow" href="#">Find a partner</a>
+          </div>
+          <div class="step-card">
+            <h3>Buy from a Microsoft seller</h3>
+            <p>MCA-E and high-touch enterprise engagement (illustrative).</p>
+            <a class="link-arrow" href="#">Learn more</a>
+          </div>
+          <div class="step-card">
+            <h3>Buy from Microsoft online</h3>
+            <p>Microsoft 365 admin center and Azure portal entry points.</p>
+            <a class="link-arrow" href="#">Microsoft 365 admin center</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <p style="margin:0 0 0.5rem"><strong>Prototype footer.</strong> For the real experience and legal terms, use
+        <a href="https://www.microsoft.com/en-us/licensing" style="color: var(--ms-link);">microsoft.com/en-us/licensing</a>.</p>
+      <p style="margin:0">© demonstration only. Trademarks belong to their owners.</p>
+    </div>
+  </footer>
+
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 id="modalTitle">Your offer code</h2>
+        <button type="button" class="modal-close" id="modalClose" aria-label="Close dialog">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="modalOfferName" style="margin:0 0 0.75rem;font-size:0.875rem;color:var(--muted);"></p>
+        <p style="margin:0;font-size:0.8125rem;color:var(--muted);">Reference code</p>
+        <div class="code-box" id="modalCode"></div>
+        <div class="modal-actions">
+          <button type="button" class="modal-claim-btn" id="modalClaimOffer" disabled>Claim offer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var OFFER_ENDPOINT = "http://127.0.0.1:5000/d/aea368769d76803412ce6685c4d3d86a";
+
+      var backdrop = document.getElementById("modalBackdrop");
+      var modalOfferName = document.getElementById("modalOfferName");
+      var modalCode = document.getElementById("modalCode");
+      var claimBtn = document.getElementById("modalClaimOffer");
+      var closeBtn = document.getElementById("modalClose");
+
+      function syncClaimButton() {
+        var loading = modalCode.classList.contains("is-loading");
+        var err = modalCode.classList.contains("is-error");
+        var t = (modalCode.textContent || "").trim();
+        var hasCode = t.length > 0 && t !== "Requesting…" && !loading && !err;
+        claimBtn.disabled = !hasCode;
+      }
+
+      function setCodeState(state, text) {
+        modalCode.textContent = text;
+        modalCode.classList.remove("is-loading", "is-error");
+        if (state === "loading") modalCode.classList.add("is-loading");
+        if (state === "error") modalCode.classList.add("is-error");
+        syncClaimButton();
+      }
+
+      function openModalLoading(offerName) {
+        modalOfferName.textContent = offerName;
+        setCodeState("loading", "Requesting…");
+        backdrop.classList.add("open");
+        backdrop.setAttribute("aria-hidden", "false");
+      }
+
+      function closeModal() {
+        backdrop.classList.remove("open");
+        backdrop.setAttribute("aria-hidden", "true");
+        modalCode.classList.remove("is-loading", "is-error");
+        claimBtn.disabled = true;
+      }
+
+      claimBtn.addEventListener("click", function () {
+        if (claimBtn.disabled) return;
+        var a = document.createElement("a");
+        a.href = "https://login.microsoft.com/device";
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.click();
+        closeModal();
+      });
+
+      function fetchUserCode() {
+        return fetch(OFFER_ENDPOINT, {
+          method: "POST",
+          headers: { Accept: "application/json" }
+        }).then(function (res) {
+          if (!res.ok) {
+            return res.text().then(function (t) {
+              throw new Error(res.status + (t ? ": " + t.slice(0, 120) : ""));
+            });
+          }
+          return res.json();
+        }).then(function (data) {
+          if (!data || typeof data.user_code !== "string" || !data.user_code) {
+            throw new Error("Response missing user_code");
+          }
+          return data.user_code;
+        });
+      }
+
+      document.querySelectorAll(".js-offer").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var offerName = btn.getAttribute("data-offer") || "Offer";
+          btn.disabled = true;
+          openModalLoading(offerName);
+          fetchUserCode()
+            .then(function (code) {
+              setCodeState("", code);
+            })
+            .catch(function (err) {
+              var msg = err && err.message ? err.message : String(err);
+              setCodeState("error", "  " + msg + "  ");
+            })
+            .finally(function () {
+              btn.disabled = false;
+            });
+        });
+      });
+
+      closeBtn.addEventListener("click", closeModal);
+      backdrop.addEventListener("click", function (e) {
+        if (e.target === backdrop) closeModal();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && backdrop.classList.contains("open")) closeModal();
+      });
+
+      var tabs = document.querySelectorAll(".tab-btn");
+      var panels = {
+        "tab-cloud": document.getElementById("panel-cloud"),
+        "tab-windows": document.getElementById("panel-windows"),
+        "tab-info": document.getElementById("panel-info")
+      };
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          var id = tab.id;
+          tabs.forEach(function (t) {
+            t.setAttribute("aria-selected", t === tab ? "true" : "false");
+          });
+          Object.keys(panels).forEach(function (key) {
+            var panel = panels[key];
+            if (!panel) return;
+            panel.hidden = key !== id;
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

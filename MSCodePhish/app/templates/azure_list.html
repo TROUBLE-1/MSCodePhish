@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Azure App / Service Principal - Device Code Phishing{% endblock %}
+{% block content %}
+<p class="mb-2">Configure your Azure AD app registration used for the device code flow.</p>
+<p class="mb-2"><a href="{{ url_for('main.azure_new') }}" class="btn btn-primary">Add Azure App</a></p>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Client ID</th>
+                <th>Tenant ID</th>
+                <th>Scope</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in configs %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td><code>{{ c.client_id[:20] }}...</code></td>
+                <td>{{ c.tenant_id }}</td>
+                <td><small>{{ c.scope[:40] }}...</small></td>
+                <td>{{ 'Yes' if c.is_active else 'No' }}</td>
+                <td>
+                    <a href="{{ url_for('main.azure_edit', id=c.id) }}" class="btn btn-sm">Edit</a>
+                    <form action="{{ url_for('main.azure_delete', id=c.id) }}" method="post" style="display:inline;" class="azure-delete-form">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No Azure configs. <a href="{{ url_for('main.azure_new') }}">Add one</a> to run campaigns.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var forms = document.querySelectorAll('.azure-delete-form');
+    if (!forms.length) return;    forms.forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var msg = 'Delete this Azure config?';
+            function doDelete() { form.submit(); }
+            if (window._dc_openConfirm) {
+                window._dc_openConfirm(msg, doDelete);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

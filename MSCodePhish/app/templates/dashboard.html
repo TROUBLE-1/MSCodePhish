@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="stats-grid" id="stats">
+    <div class="stat-card">
+        <div class="value" id="stat-campaigns">-</div>
+        <div class="label">Campaigns</div>
+    </div>
+    <div class="stat-card">
+        <div class="value" id="stat-sessions">-</div>
+        <div class="label">Total Sessions</div>
+    </div>
+    <div class="stat-card">
+        <div class="value" id="stat-pending">-</div>
+        <div class="label">Pending</div>
+    </div>
+    <div class="stat-card">
+        <div class="value" id="stat-authorized">-</div>
+        <div class="label">Authorized</div>
+    </div>
+    <div class="stat-card">
+        <div class="value" id="stat-tokens">-</div>
+        <div class="label">Captured Tokens</div>
+    </div>
+</div>
+<div class="card">
+    <h2>Quick actions</h2>
+    <p><a href="{{ url_for('main.campaign_list') }}" class="btn btn-primary">Campaigns</a>
+       <a href="{{ url_for('main.token_list') }}" class="btn">Captured Tokens</a>
+       <a href="{{ url_for('main.smtp_list') }}" class="btn">SMTP Config</a>
+       <a href="{{ url_for('main.azure_list') }}" class="btn">Azure App</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    function loadStats() {
+        fetch('{{ url_for("main.api_stats") }}')
+            .then(r => r.json())
+            .then(function (d) {
+                document.getElementById('stat-campaigns').textContent = d.campaigns;
+                document.getElementById('stat-sessions').textContent = d.sessions;
+                document.getElementById('stat-pending').textContent = d.pending;
+                document.getElementById('stat-authorized').textContent = d.authorized;
+                document.getElementById('stat-tokens').textContent = d.captured_tokens;
+            })
+            .catch(function () {
+                document.getElementById('stats').innerHTML = '<p class="text-muted">Could not load stats.</p>';
+            });
+    }
+    loadStats();
+    setInterval(loadStats, 10000);
+})();
+</script>
+{% endblock %}

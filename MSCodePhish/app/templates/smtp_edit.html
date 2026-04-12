@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if config else 'New' }} SMTP - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="card">
+    <form method="post">
+        <label>Name</label>
+        <input type="text" name="name" value="{{ config.name if config else 'default' }}" placeholder="default">
+        <label>Host</label>
+        <input type="text" name="host" value="{{ config.host if config else '' }}" placeholder="smtp.gmail.com" required>
+        <label>Port</label>
+        <input type="number" name="port" value="{{ config.port if config else 587 }}" placeholder="587">
+        <label><input type="checkbox" name="use_tls" {{ 'checked' if not config or config.use_tls else '' }}> Use TLS</label>
+        <br><br>
+        <label>Username (optional)</label>
+        <input type="text" name="username" value="{{ config.username if config else '' }}">
+        <label>Password (optional)</label>
+        <div style="display:flex; gap:0.5rem; align-items:stretch;">
+            <input id="smtp-password" type="password" name="password" value="{{ config.password if config else '' }}" placeholder="{{ 'Leave blank to keep current' if config else '' }}" style="flex:1;">
+            <button type="button" class="btn btn-sm" id="smtp-password-toggle" style="white-space:nowrap; height:100%;">Show</button>
+        </div>
+        <label>From email</label>
+        <input type="email" name="from_email" value="{{ config.from_email if config else '' }}" required>
+        <label>From name (optional)</label>
+        <input type="text" name="from_name" value="{{ config.from_name if config else '' }}">
+        <br>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{{ url_for('main.smtp_list') }}" class="btn">Cancel</a>
+        </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var toggle = document.getElementById('smtp-password-toggle');
+    var input = document.getElementById('smtp-password');
+    if (!toggle || !input) return;
+    toggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (input.type === 'password') {
+            input.type = 'text';
+            toggle.textContent = 'Hide';
+        } else {
+            input.type = 'password';
+            toggle.textContent = 'Show';
+        }
+    });
+})();
+</script>
+{% endblock %}

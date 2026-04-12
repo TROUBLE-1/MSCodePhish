@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Notifications - Device Code Phishing{% endblock %}
+{% block content %}
+<div class="card">
+    <form method="post">
+        <div style="display:flex; flex-wrap:wrap; gap:2rem;">
+            <div style="flex:1 1 300px; min-width:260px;">
+                <h2>SLACK</h2>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                    <input type="checkbox" name="slack_enabled" {% if config.slack_enabled %}checked{% endif %}>
+                    <span>Enable Slack notifications</span>
+                </label>
+                <label>Slack Bot Token</label>
+                <input type="password" name="slack_bot_token" value="{{ config.slack_bot_token or '' }}" placeholder="xoxb-...">
+                <label>Channel Name</label>
+                <input type="text" name="slack_channel" value="{{ config.slack_channel or '' }}" placeholder="#alerts or alerts">
+            </div>
+
+            <div style="flex:1 1 300px; min-width:260px;">
+                <h2>DISCORD</h2>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                    <input type="checkbox" name="discord_enabled" {% if config.discord_enabled %}checked{% endif %}>
+                    <span>Enable Discord notifications</span>
+                </label>
+                <label>Discord Bot Token</label>
+                <input type="password" name="discord_bot_token" value="{{ config.discord_bot_token or '' }}" placeholder="Bot token">
+                <label>Channel ID</label>
+                <input type="text" name="discord_channel_id" value="{{ config.discord_channel_id or '' }}" placeholder="123456789012345678">
+            </div>
+        </div>
+
+        <div style="margin-top:1rem; display:flex; justify-content:flex-start; align-items:flex-start; gap:2rem; flex-wrap:wrap;">
+            <div style="flex:1 1 300px; min-width:260px;">
+                <h3>Notification events</h3>
+                <ul class="label-hint" style="font-size:0.85rem; margin-top:0.25rem; list-style:none; padding:0;">
+                    <li style="margin-bottom:0.25rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="notify_on_session_created" {% if config.notify_on_session_created %}checked{% endif %}>
+                            <span>New session created (via email launch or API)</span>
+                        </label>
+                    </li>
+                    <li style="margin-bottom:0.25rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="notify_on_status_authorized" {% if config.notify_on_status_authorized %}checked{% endif %}>
+                            <span>Pending session becomes <strong>authorized</strong></span>
+                        </label>
+                    </li>
+                    <li style="margin-bottom:0.25rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="notify_on_status_expired" {% if config.notify_on_status_expired %}checked{% endif %}>
+                            <span>Pending session <strong>expires</strong></span>
+                        </label>
+                    </li>
+                    <li style="margin-bottom:0.25rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="notify_on_status_declined" {% if config.notify_on_status_declined %}checked{% endif %}>
+                            <span>User <strong>declines</strong> the sign-in request</span>
+                        </label>
+                    </li>
+                    <li style="margin-bottom:0.25rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="notify_on_status_error" {% if config.notify_on_status_error %}checked{% endif %}>
+                            <span>Session enters an <strong>error</strong> state (including bad/used device code)</span>
+                        </label>
+                    </li>
+                    <li style="margin-bottom:0.25rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <input type="checkbox" name="notify_on_status_cancelled" {% if config.notify_on_status_cancelled %}checked{% endif %}>
+                            <span>Session is manually <strong>cancelled</strong> from the UI</span>
+                        </label>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="margin-top:1rem; display:flex; justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
