@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Entra ID enumeration - Token {{ token.id }}{% endblock %}
+{% block content %}
+<div class="page-scroll-layout token-enum-page">
+    <header class="token-enum-header">
+        <div class="token-enum-header-top">
+            <div>
+                <p class="mb-2"><a href="{{ url_for('main.token_list') }}" class="btn btn-sm">← Back to tokens</a></p>
+                <h1 class="token-enum-title">Entra ID enumeration</h1>
+                <p class="token-enum-subtitle">
+                    Token #{{ token.id }} · {{ token.user_display_name or token.user_email or token.user_id or 'Unknown user' }}
+                    {% if token.tenant_id %} · Tenant <code>{{ token.tenant_id }}</code>{% endif %}
+                </p>
+            </div>
+            <div class="token-enum-header-side">
+                <div class="token-enum-meta">
+                    <span class="label-hint">Phishing client (refresh)</span>
+                    <strong id="enum-header-client-name">{{ default_client_name }}</strong>
+                    <code class="token-enum-client-id" id="enum-header-client-id">{{ default_client_id }}</code>
+                </div>
+                <div class="token-enum-header-actions">
+                    <span class="token-enum-token-mode-badge" id="token-enum-mode-badge">Refresh token</span>
+                    <button type="button" class="btn btn-sm btn-primary" id="token-enum-open-modal">Access token</button>
+                    {% set scope_count = token_scopes.scopes | length if token_scopes.scopes else (token_scopes.roles | length if token_scopes.roles else 0) %}
+                    <div class="token-enum-scope-popover" id="token-scope-popover">
+                        <button type="button"
+                                class="btn btn-sm token-enum-scopes-btn"
+                                id="token-scopes-btn"
+                                aria-expanded="false"
+                                aria-controls="token-scopes-tooltip">
+                            JWT scopes{% if scope_count %} ({{ scope_count }}){% endif %}
+                        </button>
+                        <div class="token-enum-scopes-tooltip app-scroll" id="token-scopes-tooltip" hidden role="tooltip">
+                            <div class="token-enum-scopes-tooltip-title">Access token claims</div>
+                            <div id="token-scopes-tooltip-body">
+                                {% if token_scopes.error and not token_scopes.scp and not token_scopes.roles %}
+                                <p class="token-enum-scopes-error">{{ token_scopes.error }}</p>
+                                {% elif token_scopes.scp %}
+                                <p class="label-hint" style="margin:0 0 0.35rem;">JWT <code>scp</code></p>
+                                <div class="token-enum-scopes-value">{{ token_scopes.scp }}</div>
+                                {% elif token_scopes.roles %}
+                                <p class="label-hint" style="margin:0 0 0.35rem;">JWT <code>roles</code></p>
+                                <div class="token-enum-scopes-value">{{ token_scopes.roles | join(' ') }}</div>
+                                {% else %}
+                                <p class="text-muted">No <code>scp</code> or <code>roles</code> claim in the current access token.</p>
+                                {% endif %}
+                                {% if token_scopes.aud %}
+                                <p class="token-enum-scopes-aud">aud: <code>{{ token_scopes.aud }}</code></p>
+                                {% endif %}
+                                {% if token_scopes.error and (token_scopes.scp or token_scopes.roles) %}
+                                <p class="token-enum-scopes-note">Note: {{ token_scopes.error }} (showing cached token claims)</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="token-enum-layout">
+        <nav class="token-enum-nav app-scroll" aria-label="Entra ID enumeration">
+            {% for section in sections %}
+            <button type="button"
+                    class="token-enum-nav-item{% if loop.first %} active{% endif %}"
+                    data-section="{{ section.id }}"
+                    data-label="{{ section.label }}">
+                <span class="token-enum-nav-label">{{ section.label }}</span>
+                <span class="token-enum-nav-count" data-section="{{ section.id }}">…</span>
+            </button>
+            {% endfor %}
+        </nav>
+
+        <div class="card card-scroll token-enum-panel">
+            <div class="token-enum-panel-head">
+                <div>
+                    <h2 id="token-enum-section-title">{{ sections[0].label }}</h2>
+                    <p id="token-enum-status" class="label-hint">Select a section or click Refresh to load live data from Microsoft Graph.</p>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" id="token-enum-refresh">Refresh</button>
+            </div>
+            <div class="card-scroll-body app-scroll">
+                <div id="token-enum-error" class="alert alert-danger" style="display:none;"></div>
+                <div id="token-enum-loading" class="token-enum-loading" style="display:none;">Loading from Microsoft Graph…</div>
+                <div class="token-enum-table-wrap app-scroll">
+                    <table class="token-enum-table" id="token-enum-table">
+                        <thead id="token-enum-thead"></thead>
+                        <tbody id="token-enum-tbody">
+                            <tr><td class="text-muted">Choose a section from the left to enumerate.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="token-enum-pagination">
+                    <button type="button" class="btn btn-sm" id="token-enum-next" style="display:none;">Load more</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block modals %}
+<div id="token-enum-popup-overlay" class="popup-overlay" style="display:none;" aria-hidden="true"></div>
+<div id="token-enum-modal" class="popup-box popup-overflow-visible token-enum-token-popup" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="token-enum-modal-title">
+    <div class="token-enum-modal-head">
+        <h2 id="token-enum-modal-title">Access token (JWT)</h2>
+        <button type="button" class="btn btn-sm" id="token-enum-close-modal" aria-label="Close">Close</button>
+    </div>
+    <p class="label-hint token-enum-modal-subtitle">Re-fetch via refresh token or paste a custom JWT for Graph enumeration.</p>
+
+    <div class="token-enum-token-bar-head">
+        <span class="token-enum-token-bar-title">Current JWT</span>
+        <div class="token-enum-token-bar-actions">
+            <button type="button" class="btn btn-sm" id="token-enum-copy-jwt" title="Copy JWT">Copy</button>
+        </div>
+    </div>
+    <pre id="token-enum-jwt-display" class="token-enum-jwt-display app-scroll">{{ initial_access_token or '(no cached access token — re-fetch below)' }}</pre>
+
+    <div class="token-enum-token-controls">
+        <div class="token-enum-token-mode" role="radiogroup" aria-label="Token source">
+            <label class="token-enum-mode-option">
+                <input type="radio" name="token-enum-mode" value="refresh" checked>
+                Re-fetch via refresh token
+            </label>
+            <label class="token-enum-mode-option">
+                <input type="radio" name="token-enum-mode" value="custom">
+                Use custom JWT
+            </label>
+        </div>
+
+        <div id="token-enum-refresh-panel" class="token-enum-refresh-panel">
+            <button type="button" class="btn btn-sm btn-primary" id="token-enum-refetch">Re-fetch token</button>
+            <p class="label-hint token-enum-refetch-hint">
+                Uses campaign client <strong>{{ default_client_name }}</strong>
+                (<code>{{ default_client_id }}</code>) with Microsoft Graph (.default).
+            </p>
+        </div>
+
+        <div id="token-enum-custom-panel" class="token-enum-custom-panel" hidden>
+            <label class="label-hint" for="token-enum-custom-jwt">Paste access token JWT</label>
+            <textarea id="token-enum-custom-jwt"
+                      class="token-enum-custom-jwt-input app-scroll"
+                      rows="4"
+                      placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs..."></textarea>
+            <div class="token-enum-custom-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="token-enum-apply-custom">Apply custom JWT</button>
+                <button type="button" class="btn btn-sm" id="token-enum-use-display-jwt">Use JWT shown above</button>
+            </div>
+        </div>
+
+        <p id="token-enum-token-status" class="label-hint token-enum-token-status"></p>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+window._tokenEnumConfig = {
+    tokenId: {{ token.id }},
+    defaultClientId: {{ default_client_id | tojson }},
+    defaultClientName: {{ default_client_name | tojson }},
+    initialAccessToken: {{ initial_access_token | tojson }},
+    accessTokenUrl: {{ ('/api/tokens/' ~ token.id ~ '/access-token') | tojson }},
+    jwtInfoUrl: {{ ('/api/tokens/' ~ token.id ~ '/jwt-info') | tojson }},
+    apiBase: {{ ('/api/tokens/' ~ token.id ~ '/entra/') | tojson }},
+    countsUrl: {{ ('/api/tokens/' ~ token.id ~ '/entra/counts') | tojson }},
+    sections: {{ sections | map(attribute='id') | list | tojson }},
+    defaultEnumScope: {{ default_enum_scope | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='token_enum.js') }}"></script>
+{% endblock %}

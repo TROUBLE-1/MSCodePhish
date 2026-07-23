@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Notifications - Device Code Phishing{% endblock %}
 {% block content %}
-<div class="card">
-    <form method="post">
+<div class="campaign-edit-page">
+<div class="card campaign-form-card">
+    <form method="post" class="campaign-form">
+        <div class="campaign-form-scroll app-scroll">
         <div style="display:flex; flex-wrap:wrap; gap:2rem;">
             <div style="flex:1 1 300px; min-width:260px;">
                 <h2>SLACK</h2>
@@ -14,6 +16,10 @@
                 <input type="password" name="slack_bot_token" value="{{ config.slack_bot_token or '' }}" placeholder="xoxb-...">
                 <label>Channel Name</label>
                 <input type="text" name="slack_channel" value="{{ config.slack_channel or '' }}" placeholder="#alerts or alerts">
+                <div class="notification-test-actions">
+                    <button type="button" class="btn btn-sm" data-notification-test="slack">Send test message</button>
+                    <span class="notification-test-status" data-notification-test-status="slack"></span>
+                </div>
             </div>
 
             <div style="flex:1 1 300px; min-width:260px;">
@@ -26,6 +32,10 @@
                 <input type="password" name="discord_bot_token" value="{{ config.discord_bot_token or '' }}" placeholder="Bot token">
                 <label>Channel ID</label>
                 <input type="text" name="discord_channel_id" value="{{ config.discord_channel_id or '' }}" placeholder="123456789012345678">
+                <div class="notification-test-actions">
+                    <button type="button" class="btn btn-sm" data-notification-test="discord">Send test message</button>
+                    <span class="notification-test-status" data-notification-test-status="discord"></span>
+                </div>
             </div>
         </div>
 
@@ -72,10 +82,15 @@
                 </ul>
             </div>
         </div>
-
-        <div style="margin-top:1rem; display:flex; justify-content:flex-end;">
+        </div>
+        <div class="campaign-form-footer">
             <button type="submit" class="btn btn-primary">Save</button>
         </div>
     </form>
 </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window._notificationTestUrl = {{ url_for('main.api_notifications_test') | tojson }};</script>
+<script src="{{ url_for('static', filename='notification_test.js') }}"></script>
 {% endblock %}

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Campaigns - Device Code Phishing{% endblock %}
 {% block content %}
+<div class="page-scroll-layout">
 <p class="mb-2"><a href="{{ url_for('main.campaign_new') }}" class="btn btn-primary">New Campaign</a></p>
-<div class="card">
+<div class="card card-scroll">
+    <div class="card-scroll-body app-scroll">
     <table>
         <thead>
             <tr>
@@ -26,9 +28,13 @@
                 <td>{{ row.pending_sessions }}</td>
                 <td>{{ row.authorized_sessions }}</td>
                 <td>{{ row.error_sessions }}</td>
-                <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
+                <td class="local-time" data-utc="{{ c.created_at.isoformat() if c.created_at else '' }}">-</td>
                 <td>
                     <a href="{{ url_for('main.campaign_detail', id=c.id) }}" class="btn btn-sm">View</a>
+                    <button type="button"
+                            class="btn btn-sm campaign-report-btn"
+                            data-campaign-id="{{ c.id }}"
+                            data-campaign-name="{{ (c.name or 'Unnamed') | e }}">Report</button>
                     <a href="{{ url_for('main.campaign_edit', id=c.id) }}" class="btn btn-sm">Edit</a>
                     <form action="{{ url_for('main.campaign_delete', id=c.id) }}" method="post" style="display:inline;" class="campaign-delete-form">
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
@@ -40,9 +46,15 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+</div>
 </div>
 {% endblock %}
+{% block modals %}
+{% include 'partials/campaign_report_modal.html' %}
+{% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='campaign_report.js') }}"></script>
 <script>
 (function () {
     // Live updates from background polling / API

@@ -69,7 +69,8 @@
             'Notifications' if request.endpoint == 'main.notifications' else
             'Azure App / SP' if request.endpoint.startswith('main.azure_') else
             'Campaigns' if request.endpoint.startswith('main.campaign_') else
-            'Captured Tokens' if request.endpoint.startswith('main.token_') else
+            'Captured Tokens' if request.endpoint.startswith('main.token_') and request.endpoint != 'main.token_enum' else
+            'Entra ID enumeration' if request.endpoint == 'main.token_enum' else
             'Profile' if request.endpoint == 'main.profile' else
             'MSCodePhish'
         %}
@@ -112,9 +113,22 @@
             {% endif %}
         {% endwith %}
 
+        <div class="page-body">
         {% block content %}{% endblock %}
+        </div>
     </main>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-8i+wGkVfdLlNUovOwZlFGMPR8ew9FHQ+UTLXQqNt5kL/5S3NObCR1zQ3AAtF7wZ1" crossorigin="anonymous"></script>
+    {% block modals %}{% endblock %}
+    <div id="confirm-popup-overlay" class="popup-overlay" style="display:none;" aria-hidden="true"></div>
+    <div id="confirm-popup" class="popup-box" style="display:none;" role="dialog" aria-labelledby="confirm-popup-title" aria-modal="true">
+        <h3 id="confirm-popup-title">Please confirm</h3>
+        <p id="confirm-popup-message" class="mb-2" style="font-size:0.9rem;"></p>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+            <button type="button" class="btn" id="confirm-popup-cancel">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirm-popup-ok">Delete</button>
+        </div>
+    </div>
+    <div id="client-picker-portal" class="client-id-picker-portal" aria-hidden="true"></div>
+    <script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

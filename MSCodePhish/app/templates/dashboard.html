@@ -1,55 +1,139 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - Device Code Phishing{% endblock %}
 {% block content %}
-<div class="stats-grid" id="stats">
-    <div class="stat-card">
-        <div class="value" id="stat-campaigns">-</div>
-        <div class="label">Campaigns</div>
+<div class="page-scroll-layout dashboard-page">
+    <header class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">Overview</h1>
+            <p class="dashboard-subtitle">Platform-wide assessment activity and compromise metrics</p>
+        </div>
+        <p class="dashboard-updated text-muted" id="dashboard-updated">Loading…</p>
+    </header>
+
+    <div class="dashboard-kpi-grid" id="dashboard-kpis">
+        <div class="dashboard-kpi-card kpi-danger">
+            <div class="kpi-value" id="stat-compromise-rate">-</div>
+            <div class="kpi-label">Compromise rate</div>
+            <div class="kpi-meta" id="stat-compromise-meta">- authorized</div>
+        </div>
+        <div class="dashboard-kpi-card kpi-warning">
+            <div class="kpi-value" id="stat-authorized">-</div>
+            <div class="kpi-label">Authorized sessions</div>
+            <div class="kpi-meta" id="stat-tokens-meta">- tokens captured</div>
+        </div>
+        <div class="dashboard-kpi-card kpi-accent">
+            <div class="kpi-value" id="stat-sessions">-</div>
+            <div class="kpi-label">Total sessions</div>
+            <div class="kpi-meta" id="stat-pending-meta">- pending</div>
+        </div>
+        <div class="dashboard-kpi-card kpi-success">
+            <div class="kpi-value" id="stat-campaigns">-</div>
+            <div class="kpi-label">Campaigns</div>
+            <div class="kpi-meta" id="stat-running-meta">- running</div>
+        </div>
     </div>
-    <div class="stat-card">
-        <div class="value" id="stat-sessions">-</div>
-        <div class="label">Total Sessions</div>
+
+    <div class="dashboard-grid-2">
+        <div class="card dashboard-panel">
+            <h2>Session outcomes</h2>
+            <div class="dashboard-bar-chart" id="outcome-bars"></div>
+            <div class="dashboard-mini-stats">
+                <span><strong id="stat-emails">-</strong> emails sent</span>
+                <span><strong id="stat-delivery-rate">-</strong>% delivery rate</span>
+                <span><strong id="stat-expired">-</strong> expired</span>
+                <span><strong id="stat-errors">-</strong> errors</span>
+            </div>
+        </div>
+
+        <div class="card dashboard-panel">
+            <h2>Account classification</h2>
+            <div class="dashboard-bar-chart" id="account-bars"></div>
+            <div class="dashboard-mini-stats">
+                <span class="badge badge-corporate" id="badge-corporate">corporate 0</span>
+                <span class="badge badge-personal" id="badge-personal">personal 0</span>
+                <span class="badge badge-cancelled" id="badge-unknown">unknown 0</span>
+            </div>
+        </div>
     </div>
-    <div class="stat-card">
-        <div class="value" id="stat-pending">-</div>
-        <div class="label">Pending</div>
+
+    <div class="dashboard-grid-2">
+        <div class="card dashboard-panel">
+            <div class="dashboard-panel-head">
+                <h2>Recent compromises</h2>
+                <a href="{{ url_for('main.token_list') }}" class="btn btn-sm">All tokens</a>
+            </div>
+            <div class="dashboard-table-wrap app-scroll">
+                <table class="dashboard-table" id="recent-auth-table">
+                    <thead>
+                        <tr>
+                            <th>Identity</th>
+                            <th>Campaign</th>
+                            <th>Account</th>
+                            <th>Time (UTC)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-auth-body">
+                        <tr><td colspan="4" class="text-muted">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card dashboard-panel">
+            <div class="dashboard-panel-head">
+                <h2>Campaigns</h2>
+                <a href="{{ url_for('main.campaign_list') }}" class="btn btn-sm btn-primary">View all</a>
+            </div>
+            <div class="dashboard-table-wrap app-scroll">
+                <table class="dashboard-table" id="campaigns-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Sessions</th>
+                            <th>Auth</th>
+                        </tr>
+                    </thead>
+                    <tbody id="campaigns-body">
+                        <tr><td colspan="4" class="text-muted">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    <div class="stat-card">
-        <div class="value" id="stat-authorized">-</div>
-        <div class="label">Authorized</div>
+
+    <div class="card dashboard-panel">
+        <h2>Quick actions</h2>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('main.campaign_new') }}" class="dashboard-action-card">
+                <span class="dashboard-action-title">New campaign</span>
+                <span class="dashboard-action-desc">Create a device-code phishing assessment</span>
+            </a>
+            <a href="{{ url_for('main.campaign_list') }}" class="dashboard-action-card">
+                <span class="dashboard-action-title">Campaigns</span>
+                <span class="dashboard-action-desc">Manage sessions and launch reports</span>
+            </a>
+            <a href="{{ url_for('main.token_list') }}" class="dashboard-action-card">
+                <span class="dashboard-action-title">Captured tokens</span>
+                <span class="dashboard-action-desc">Review refresh tokens and test API access</span>
+            </a>
+            <a href="{{ url_for('main.smtp_list') }}" class="dashboard-action-card">
+                <span class="dashboard-action-title">SMTP config</span>
+                <span class="dashboard-action-desc">Email delivery via SMTP</span>
+            </a>
+            <a href="{{ url_for('main.azure_list') }}" class="dashboard-action-card">
+                <span class="dashboard-action-title">Azure app</span>
+                <span class="dashboard-action-desc">Graph mail and app registration settings</span>
+            </a>
+            <a href="{{ url_for('main.notifications') }}" class="dashboard-action-card">
+                <span class="dashboard-action-title">Notifications</span>
+                <span class="dashboard-action-desc">Webhook alerts on authorization</span>
+            </a>
+        </div>
     </div>
-    <div class="stat-card">
-        <div class="value" id="stat-tokens">-</div>
-        <div class="label">Captured Tokens</div>
-    </div>
-</div>
-<div class="card">
-    <h2>Quick actions</h2>
-    <p><a href="{{ url_for('main.campaign_list') }}" class="btn btn-primary">Campaigns</a>
-       <a href="{{ url_for('main.token_list') }}" class="btn">Captured Tokens</a>
-       <a href="{{ url_for('main.smtp_list') }}" class="btn">SMTP Config</a>
-       <a href="{{ url_for('main.azure_list') }}" class="btn">Azure App</a></p>
 </div>
 {% endblock %}
 {% block scripts %}
-<script>
-(function () {
-    function loadStats() {
-        fetch('{{ url_for("main.api_stats") }}')
-            .then(r => r.json())
-            .then(function (d) {
-                document.getElementById('stat-campaigns').textContent = d.campaigns;
-                document.getElementById('stat-sessions').textContent = d.sessions;
-                document.getElementById('stat-pending').textContent = d.pending;
-                document.getElementById('stat-authorized').textContent = d.authorized;
-                document.getElementById('stat-tokens').textContent = d.captured_tokens;
-            })
-            .catch(function () {
-                document.getElementById('stats').innerHTML = '<p class="text-muted">Could not load stats.</p>';
-            });
-    }
-    loadStats();
-    setInterval(loadStats, 10000);
-})();
-</script>
+<script>window._dc_stats_url = {{ url_for('main.api_stats') | tojson }};</script>
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 {% endblock %}

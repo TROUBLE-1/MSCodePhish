@@ -1,37 +1,45 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Edit' if campaign else 'New' }} Campaign - Device Code Phishing{% endblock %}
 {% block content %}
-<div class="card">
+<div class="campaign-edit-page">
+<div class="card campaign-form-card">
     {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
+    <div class="alert alert-danger campaign-form-error">{{ error }}</div>
     {% endif %}
-    <form method="post">
-        <div style="display:flex; flex-wrap:wrap; gap:2rem; align-items:flex-start;">
+    <form method="post" class="campaign-form">
+        <div class="campaign-form-scroll app-scroll">
+        <div class="campaign-form-columns">
             <div style="flex:1 1 380px; min-width:320px;">
                 <label>Campaign name</label>
                 <input type="text" name="name" value="{{ campaign.name if campaign else '' }}" placeholder="e.g. Q1 Phish Test">
                 <label>Device code flow: Microsoft public client</label>
-                <p class="label-hint" style="font-size:0.85rem; margin-top:0.25rem; margin-bottom:0.25rem;">
-                    Choose which public <code>client_id</code> to use for the device code flow, or provide your own.
+                <p class="label-hint" style="font-size:0.85rem; margin-top:0.25rem; margin-bottom:0.5rem;">
+                    Desktop / CLI apps only (public device-code clients). Search the list or type a custom GUID.
                 </p>
                 {% set current_public = campaign.public_client_id if campaign else '' %}
-                <input type="text"
-                       name="public_client_id"
-                       value="{{ current_public }}"
-                       placeholder="Public client_id (e.g. Azure CLI / PowerShell / custom)"
-                       style="max-width:383px;">
-                <div style="font-size:0.85rem;">
-                    <span style="font-weight:600; margin-right:0.5rem;">Quick picks:</span>
-                    <button type="button"
-                            class="btn btn-sm"
-                            onclick="document.querySelector('input[name=&quot;public_client_id&quot;]').value='14d82eec-204b-4c2f-b7e8-296a70dab67e';">
-                        Azure CLI
-                    </button>
-                    <button type="button"
-                            class="btn btn-sm"
-                            onclick="document.querySelector('input[name=&quot;public_client_id&quot;]').value='1950a258-227b-4e31-a9cf-717495945fc2';">
-                        PowerShell
-                    </button>
+                <div class="client-id-picker" id="public-client-picker">
+                    <div class="client-id-picker-field">
+                        <input type="text"
+                               name="public_client_id"
+                               id="public_client_id"
+                               class="client-id-picker-input"
+                               value="{{ current_public }}"
+                               placeholder="Search or type client_id (GUID)"
+                               autocomplete="off"
+                               spellcheck="false">
+                        <button type="button" class="btn btn-sm client-id-picker-browse-btn" id="public-client-browse-btn" aria-expanded="false" aria-controls="public-client-panel">Browse</button>
+                    </div>
+                    <p class="label-hint client-id-picker-match" id="public-client-match" hidden></p>
+                    <div class="client-id-picker-panel app-scroll" id="public-client-panel" hidden>
+                        <input type="search"
+                               id="public-client-search"
+                               class="client-id-picker-search"
+                               placeholder="Search by app name or client ID..."
+                               autocomplete="off"
+                               spellcheck="false">
+                        <div class="client-id-picker-list" id="public-client-list" role="listbox" aria-label="Public client apps"></div>
+                        <p class="label-hint client-id-picker-empty" id="public-client-empty" hidden>No matching apps. You can still use a custom client ID above.</p>
+                    </div>
                 </div>
             </div>
 
@@ -76,20 +84,91 @@
 
         <label>Email subject (placeholders: {% raw %}{{user_code}}{% endraw %})</label>
         <input type="text" name="email_subject" value="{{ campaign.email_subject if campaign else 'Sign in to your account' }}" placeholder="Sign in to your account">
-        <label>Email body (HTML). Placeholders: {% raw %}{{user_code}}{% endraw %}, {% raw %}{{verification_uri}}{% endraw %}. <br>
+        <label>Email body (HTML). Placeholders: {% raw %}{{user_code}}{% endraw %}, {% raw %}{{verification_uri}}{% endraw %}, {% raw %}{{message}}{% endraw %}. <br>
         Device Code login URL: https://login.microsoft.com/device</label>
-        <textarea name="email_body_html" rows="16" style="width:100%; max-width:900px; min-height:260px;">{{ campaign.email_body_html if campaign else default_email_body }}</textarea>
-        <br>
+        <div class="campaign-email-actions">
+            <input type="email" class="campaign-test-email-input" name="test_email_device_code" placeholder="Test recipient email" autocomplete="email">
+            <button type="button" class="btn btn-sm" data-email-test-btn data-email-test-mode="device_code">Send test email</button>
+            <button type="button" class="btn btn-sm" data-email-preview-btn data-email-preview-target="textarea[name='email_body_html']" data-email-preview-mode="device_code">Preview HTML</button>
+        </div>
+        <textarea name="email_body_html" rows="12" class="campaign-form-textarea">{{ (campaign.email_body_html if campaign else default_email_body) | e }}</textarea>
+
+        <hr class="section-divider">
+        <h2 class="mb-2">Post-authentication email</h2>
+        <p class="label-hint" style="margin-bottom: 0.75rem;">
+            Optional follow-up email sent automatically after a victim completes device code sign-in.
+            Uses the same SMTP or Azure delivery settings configured above.
+        </p>
+        <div class="email-delivery-options mb-2">
+            <label class="radio-label">
+                <input type="radio" name="send_post_auth_email" value="no" {{ 'checked' if not campaign or not campaign.send_post_auth_email else '' }}> Do not send after auth
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="send_post_auth_email" value="yes" {{ 'checked' if campaign and campaign.send_post_auth_email else '' }}> Send email after successful auth
+            </label>
+        </div>
+
+        <div id="post-auth-email-block">
+            <p class="label-hint" style="margin-bottom: 0.75rem;">
+                Placeholders:
+                {% raw %}{{user_name}}{% endraw %},
+                {% raw %}{{display_name}}{% endraw %},
+                {% raw %}{{name}}{% endraw %},
+                {% raw %}{{user_email}}{% endraw %},
+                {% raw %}{{user_id}}{% endraw %},
+                {% raw %}{{target_email}}{% endraw %},
+                {% raw %}{{given_name}}{% endraw %},
+                {% raw %}{{family_name}}{% endraw %},
+                {% raw %}{{account_type}}{% endraw %},
+                {% raw %}{{tenant_id}}{% endraw %}
+            </p>
+            <label>Post-auth email subject</label>
+            <input type="text"
+                   name="post_auth_email_subject"
+                   value="{% if campaign and campaign.post_auth_email_subject %}{{ campaign.post_auth_email_subject | e }}{% else %}Sign-in confirmation for {% raw %}{{user_name}}{% endraw %}{% endif %}"
+                   placeholder="Sign-in confirmation for {% raw %}{{user_name}}{% endraw %}">
+            <label>Post-auth email body (HTML)</label>
+            <div class="campaign-email-actions">
+                <input type="email" class="campaign-test-email-input" name="test_email_post_auth" placeholder="Test recipient email" autocomplete="email">
+                <button type="button" class="btn btn-sm" data-email-test-btn data-email-test-mode="post_auth">Send test email</button>
+                <button type="button" class="btn btn-sm" data-email-preview-btn data-email-preview-target="textarea[name='post_auth_email_body_html']" data-email-preview-mode="post_auth">Preview HTML</button>
+            </div>
+            <textarea name="post_auth_email_body_html" rows="14" class="campaign-form-textarea">{{ (campaign.post_auth_email_body_html if campaign and campaign.post_auth_email_body_html else default_post_auth_email_body) | e }}</textarea>
+        </div>
+        </div>
+
+        <div class="campaign-form-footer">
         <button type="submit" class="btn btn-primary">Save</button>
         {% if campaign %}
         <a href="{{ url_for('main.campaign_detail', id=campaign.id) }}" class="btn">View campaign</a>
         {% else %}
         <a href="{{ url_for('main.campaign_list') }}" class="btn">Cancel</a>
         {% endif %}
+        </div>
     </form>
+</div>
+</div>
+{% endblock %}
+{% block modals %}
+<div id="email-preview-overlay" class="popup-overlay email-preview-overlay" style="display: none;" aria-hidden="true">
+    <div id="email-preview-popup" class="popup-box email-preview-popup" role="dialog" aria-labelledby="email-preview-title" aria-modal="true">
+        <h3 id="email-preview-title">Email preview</h3>
+        <p class="label-hint" style="margin: 0 0 0.75rem 0; font-size: 0.85rem;">
+            Sample placeholder values are shown. JavaScript and embedded content are blocked in this preview.
+        </p>
+        <iframe id="email-preview-frame" class="email-preview-frame" sandbox="" title="Email HTML preview"></iframe>
+        <div style="display: flex; justify-content: flex-end; margin-top: 0.75rem;">
+            <button type="button" class="btn btn-primary" id="email-preview-close">Close</button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 {% block scripts %}
+<script>window._publicClients = {{ public_clients | tojson }};</script>
+<script>window._campaignTestEmailUrl = {{ (url_for('main.campaign_send_test_email', id=campaign.id) if campaign else url_for('main.campaign_send_test_email')) | tojson }};</script>
+<script src="{{ url_for('static', filename='public_client_picker.js') }}"></script>
+<script src="{{ url_for('static', filename='email_preview.js') }}"></script>
+<script src="{{ url_for('static', filename='campaign_test_email.js') }}"></script>
 <script>
 (function () {
     var radios = document.querySelectorAll('input[name="email_delivery_method"]');
@@ -98,11 +177,24 @@
     function showBlocks() {
         var v = document.querySelector('input[name="email_delivery_method"]:checked');
         v = v ? v.value : 'none';
-        smtpBlock.style.display = v === 'smtp' ? 'block' : 'none';
-        azureBlock.style.display = v === 'azure' ? 'block' : 'none';
+        if (smtpBlock) smtpBlock.style.display = v === 'smtp' ? 'block' : 'none';
+        if (azureBlock) azureBlock.style.display = v === 'azure' ? 'block' : 'none';
     }
     radios.forEach(function (r) { r.addEventListener('change', showBlocks); });
     showBlocks();
+})();
+
+(function () {
+    var postAuthRadios = document.querySelectorAll('input[name="send_post_auth_email"]');
+    var postAuthBlock = document.getElementById('post-auth-email-block');
+    function showPostAuthBlock() {
+        if (!postAuthBlock) return;
+        var v = document.querySelector('input[name="send_post_auth_email"]:checked');
+        var enabled = v && v.value === 'yes';
+        postAuthBlock.style.display = enabled ? 'block' : 'none';
+    }
+    postAuthRadios.forEach(function (r) { r.addEventListener('change', showPostAuthBlock); });
+    showPostAuthBlock();
 })();
 </script>
 {% endblock %}

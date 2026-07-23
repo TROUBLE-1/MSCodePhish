@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}SMTP Config - Device Code Phishing{% endblock %}
 {% block content %}
+<div class="page-scroll-layout">
 <p class="mb-2"><a href="{{ url_for('main.smtp_new') }}" class="btn btn-primary">Add SMTP</a></p>
-<div class="card">
+<div class="card card-scroll">
+    <div class="card-scroll-body app-scroll">
     <table>
         <thead>
             <tr>
@@ -34,6 +36,8 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+</div>
 </div>
 {% endblock %}
 {% block scripts %}

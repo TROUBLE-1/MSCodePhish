@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Profile - Device Code Phishing{% endblock %}
 {% block content %}
-<div class="card">
+<div class="page-scroll-layout">
+<div class="card card-scroll">
+    <div class="card-scroll-body app-scroll">
     <form method="post">
         <label>Username</label>
         <input type="text" name="username" value="{{ g.current_user.username }}" required>
@@ -19,5 +21,7 @@
             <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
     </form>
+    </div>
+</div>
 </div>
 {% endblock %}

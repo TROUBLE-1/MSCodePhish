@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Azure App / Service Principal - Device Code Phishing{% endblock %}
 {% block content %}
-<p class="mb-2">Configure your Azure AD app registration used for the device code flow.</p>
+<div class="page-scroll-layout">
+<p class="mb-2 page-intro">Configure your Azure AD app registration used for the device code flow.</p>
 <p class="mb-2"><a href="{{ url_for('main.azure_new') }}" class="btn btn-primary">Add Azure App</a></p>
-<div class="card">
+<div class="card card-scroll">
+    <div class="card-scroll-body app-scroll">
     <table>
         <thead>
             <tr>
@@ -35,6 +37,8 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+</div>
 </div>
 {% endblock %}
 {% block scripts %}

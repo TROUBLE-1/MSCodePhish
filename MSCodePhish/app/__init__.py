@@ -3,7 +3,7 @@ from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO
-from config import Config
+from app.config import Config
 from werkzeug.security import generate_password_hash
 
 db = SQLAlchemy()
@@ -21,6 +21,10 @@ def create_app(config_class=Config):
         # Import models so SQLAlchemy is aware of them, then create tables.
         from app import models  # noqa: F401
         db.create_all()
+        from app.db_migrate import ensure_schema
+        ensure_schema(db)
+        from app.identity import backfill_session_identity
+        backfill_session_identity(db)
         # Ensure at least one admin user exists.
         from app.models import User
         if User.query.count() == 0:

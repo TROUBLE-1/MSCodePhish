@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" class="app-scroll">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Assessment Report - {{ report.campaign.name or 'Campaign' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app_scroll.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='report.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/mscodephish_logo.png') }}">
+</head>
+<body class="report-body app-scroll{% if embed %} report-body-embed{% endif %}">
+    {% if not embed %}
+    <div class="report-toolbar">
+        <span>Security Assessment Report</span>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <a href="{{ url_for('main.campaign_detail', id=report.campaign.id) }}" class="btn-report">← Back to campaign</a>
+            <button type="button" class="btn-report btn-report-primary" onclick="window.print()">Print / Save PDF</button>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="{% if embed %}report-page-canvas{% endif %}">
+    <article class="report-document">
+        <div class="report-banner">Confidential - Authorized Security Assessment Only</div>
+
+        <header class="report-header">
+            <h1>Device Code Phishing Assessment Report</h1>
+            <p class="subtitle">{{ report.campaign.name or 'Unnamed campaign' }}</p>
+        </header>
+
+        <dl class="report-meta-grid">
+            <div>
+                <dt>Campaign ID</dt>
+                <dd>#{{ report.campaign.id }}</dd>
+            </div>
+            <div>
+                <dt>Report generated (UTC)</dt>
+                <dd>{{ report.generated_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</dd>
+            </div>
+            <div>
+                <dt>Campaign status</dt>
+                <dd>{{ report.ui_status | capitalize }}</dd>
+            </div>
+            <div>
+                <dt>Campaign created (UTC)</dt>
+                <dd>{{ report.campaign.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.campaign.created_at else '-' }} UTC</dd>
+            </div>
+            <div>
+                <dt>Public client application</dt>
+                <dd>{{ report.client_name }}{% if report.client_id and report.client_name != report.client_id %}<br><span class="report-mono report-meta-sub">{{ report.client_id }}</span>{% endif %}</dd>
+            </div>
+            <div>
+                <dt>Email delivery</dt>
+                <dd>{{ report.delivery_label }}</dd>
+            </div>
+        </dl>
+
+        <section class="report-section">
+            <h2>Executive summary</h2>
+            <div class="report-risk {{ report.risk_class }}">{{ report.risk_level }}</div>
+            {% for paragraph in report.executive.paragraphs %}
+            <p class="report-prose">{{ paragraph }}</p>
+            {% endfor %}
+            {% if report.executive.highlights %}
+            <h3 class="report-subheading">Key findings</h3>
+            <ul class="report-findings report-highlights">
+                {% for item in report.executive.highlights %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <div class="report-kpi-row">
+                <div class="report-kpi">
+                    <div class="value">{{ report.total_sessions }}</div>
+                    <div class="label">Sessions launched</div>
+                </div>
+                <div class="report-kpi kpi-danger">
+                    <div class="value">{{ report.authorized_count }}</div>
+                    <div class="label">Compromised (authorized)</div>
+                </div>
+                <div class="report-kpi">
+                    <div class="value">{{ report.success_rate }}%</div>
+                    <div class="label">Compromise rate</div>
+                </div>
+                <div class="report-kpi">
+                    <div class="value">{{ report.tokens_captured }}</div>
+                    <div class="label">Tokens captured</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h2>Visual analysis</h2>
+            <div class="report-charts-grid">
+                <div class="report-chart-card">
+                    <h3 class="report-chart-title">Session outcomes</h3>
+                    {% if report.charts.outcome_total %}
+                    <div class="report-chart-donut-wrap">
+                        <svg class="report-chart-donut" viewBox="0 0 200 200" role="img" aria-label="Session outcome breakdown">
+                            {% for slice in report.charts.outcome_slices %}
+                            <path d="{{ slice.path }}" fill="{{ slice.color }}" />
+                            {% endfor %}
+                            <text x="100" y="96" text-anchor="middle" class="report-donut-total">{{ report.charts.outcome_total }}</text>
+                            <text x="100" y="114" text-anchor="middle" class="report-donut-label">sessions</text>
+                        </svg>
+                        <ul class="report-chart-legend">
+                            {% for item in report.charts.outcome_legend %}
+                            <li>
+                                <span class="report-legend-swatch" style="background: {{ item.color }}"></span>
+                                <span class="report-legend-text">{{ item.label }}</span>
+                                <strong>{{ item.value }}</strong>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% else %}
+                    <p class="report-empty">No session data to chart.</p>
+                    {% endif %}
+                </div>
+
+                <div class="report-chart-card">
+                    <h3 class="report-chart-title">Account classification</h3>
+                    {% if report.charts.account_total %}
+                    <div class="report-chart-donut-wrap">
+                        <svg class="report-chart-donut" viewBox="0 0 200 200" role="img" aria-label="Account type breakdown">
+                            {% for slice in report.charts.account_slices %}
+                            <path d="{{ slice.path }}" fill="{{ slice.color }}" />
+                            {% endfor %}
+                            <text x="100" y="96" text-anchor="middle" class="report-donut-total">{{ report.charts.account_total }}</text>
+                            <text x="100" y="114" text-anchor="middle" class="report-donut-label">accounts</text>
+                        </svg>
+                        <ul class="report-chart-legend">
+                            {% for item in report.charts.account_legend %}
+                            <li>
+                                <span class="report-legend-swatch" style="background: {{ item.color }}"></span>
+                                <span class="report-legend-text">{{ item.label }}</span>
+                                <strong>{{ item.value }}</strong>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% else %}
+                    <p class="report-empty">No account classification data recorded.</p>
+                    {% endif %}
+                </div>
+
+                <div class="report-chart-card report-chart-card-wide">
+                    <h3 class="report-chart-title">Assessment funnel</h3>
+                    <div class="report-bar-chart">
+                        {% for bar in report.charts.funnel_bars %}
+                        <div class="report-bar-row">
+                            <span class="report-bar-label">{{ bar.label }}</span>
+                            <div class="report-bar-track">
+                                <div class="report-bar-fill" style="width: {{ bar.pct }}%; background: {{ bar.color }}"></div>
+                            </div>
+                            <span class="report-bar-value">{{ bar.value }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p class="report-chart-note">Funnel shows progression from session launch through email delivery to successful device-code authentication.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h2>Session outcome breakdown</h2>
+            <div class="report-split-stats">
+                <div>
+                    <ul class="report-stat-list">
+                        <li><span>Authorized (compromised)</span><strong>{{ report.status_counts.authorized }}</strong></li>
+                        <li><span>Pending</span><strong>{{ report.status_counts.pending }}</strong></li>
+                        <li><span>Expired</span><strong>{{ report.status_counts.expired }}</strong></li>
+                        <li><span>Error</span><strong>{{ report.status_counts.error }}</strong></li>
+                        <li><span>Denied / cancelled / other</span><strong>{{ report.status_counts.denied + report.status_counts.cancelled + report.status_counts.other }}</strong></li>
+                    </ul>
+                </div>
+                <div>
+                    <ul class="report-stat-list">
+                        <li><span>Phishing emails sent</span><strong>{{ report.emails_delivered }} ({{ report.delivery_rate }}%)</strong></li>
+                        <li><span>Personal (MSA) accounts</span><strong>{{ report.account_counts.personal }}</strong></li>
+                        <li><span>Corporate (work/school)</span><strong>{{ report.account_counts.corporate }}</strong></li>
+                        <li><span>Account type unknown</span><strong>{{ report.account_counts.unknown }}</strong></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h2>Findings - successful authentications</h2>
+            {% if report.authorized_rows %}
+            <div class="report-table-wrap app-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Identity / target</th>
+                        <th>Email (UPN)</th>
+                        <th>Account</th>
+                        <th>Tenant ID</th>
+                        <th>Source IP</th>
+                        <th>Token</th>
+                        <th>Time (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report.authorized_rows %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.target }}</td>
+                        <td>{{ row.user_email }}</td>
+                        <td>
+                            {% if row.account_type == 'personal' %}
+                                <span class="report-badge report-badge-personal">personal</span>
+                            {% elif row.account_type == 'corporate' %}
+                                <span class="report-badge report-badge-corporate">corporate</span>
+                            {% else %}
+                                {{ row.account_type }}
+                            {% endif %}
+                        </td>
+                        <td><code class="report-mono">{{ row.tenant_id }}</code></td>
+                        <td>{{ row.source_ip }}</td>
+                        <td>{{ 'Yes' if row.has_token else 'No' }}</td>
+                        <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="report-empty">No successful authentications recorded for this campaign.</p>
+            {% endif %}
+        </section>
+
+        <section class="report-section">
+            <h2>Other sessions</h2>
+            {% if report.other_rows %}
+            <div class="report-table-wrap app-scroll">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Target</th>
+                        <th>Status</th>
+                        <th>Email sent</th>
+                        <th>Notes</th>
+                        <th>Time (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report.other_rows %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.target }}</td>
+                        <td>
+                            <span class="report-badge report-badge-{{ row.status if row.status in ['pending','expired','error','authorized'] else 'expired' }}">{{ row.status }}</span>
+                        </td>
+                        <td>{{ 'Yes' if row.email_sent else 'No' }}</td>
+                        <td class="report-cell-notes">{{ row.error_message or '-' }}</td>
+                        <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="report-empty">No additional sessions.</p>
+            {% endif %}
+        </section>
+
+        <section class="report-section">
+            <h2>Remediation recommendations</h2>
+            <ol class="report-findings">
+                {% for item in report.recommendations %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ol>
+        </section>
+
+        <footer class="report-footer">
+            <p style="margin:0;">
+                Generated by MSCodePhish for internal security assessment purposes.
+                Distribution is limited to authorized assessment personnel.
+                Data reflects campaign #{{ report.campaign.id }} as of {{ report.generated_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC.
+            </p>
+        </footer>
+    </article>
+    </div>
+</body>
+</html>

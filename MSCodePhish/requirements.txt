@@ -6,3 +6,6 @@ requests==2.31.0
 python-dotenv==1.0.0
 email-validator==2.1.0
 apscheduler==3.10.4
+flask_cors==5.0.0
+flask_socketio==5.3.7
+eventlet==0.33.3
