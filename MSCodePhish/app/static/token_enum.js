@@ -6,6 +6,7 @@
     var sectionTitle = document.getElementById('token-enum-section-title');
     var statusEl = document.getElementById('token-enum-status');
     var errorEl = document.getElementById('token-enum-error');
+    var postureEl = document.getElementById('token-enum-posture');
     var loadingEl = document.getElementById('token-enum-loading');
     var thead = document.getElementById('token-enum-thead');
     var tbody = document.getElementById('token-enum-tbody');
@@ -177,6 +178,22 @@
         });
     }
 
+    function showPosture(posture) {
+        if (!postureEl) return;
+        if (!posture || !posture.label) {
+            postureEl.style.display = 'none';
+            postureEl.innerHTML = '';
+            postureEl.className = 'token-enum-posture';
+            return;
+        }
+        var status = posture.status || 'unavailable';
+        postureEl.className = 'token-enum-posture token-enum-posture-' + status;
+        postureEl.innerHTML =
+            '<div class="token-enum-posture-title">Device code CA posture: ' + esc(posture.label) + '</div>' +
+            '<div class="token-enum-posture-summary">' + esc(posture.summary || '') + '</div>';
+        postureEl.style.display = 'block';
+    }
+
     function showError(msg) {
         if (!errorEl) return;
         if (msg) {
@@ -281,6 +298,9 @@
         }
 
         showError(null);
+        if (!appendMode) {
+            showPosture(null);
+        }
         setLoading(true);
         if (!appendMode && tbody) {
             tbody.innerHTML = '<tr><td class="text-muted">Loading…</td></tr>';
@@ -307,6 +327,37 @@
                     return;
                 }
                 renderTable(d.columns || [], d.rows || [], appendMode);
+                if (!appendMode && (d.posture || sectionId === 'authentication-flows' || sectionId === 'conditional-access')) {
+                    if (d.posture) {
+                        showPosture(d.posture);
+                    } else if (sectionId === 'conditional-access') {
+                        var targeting = (d.rows || []).filter(function (r) {
+                            return String(r.targetsDeviceCode || '').toLowerCase() === 'yes';
+                        });
+                        var enabledBlocks = targeting.filter(function (r) {
+                            return String(r.state || '').toLowerCase() === 'enabled'
+                                && String(r.grantAction || '').toLowerCase() === 'block';
+                        });
+                        var allUserBlocks = enabledBlocks.filter(function (r) {
+                            return String(r.userScope || '').indexOf('All users') === 0;
+                        });
+                        var label = 'Not protected';
+                        var status = 'unprotected';
+                        var summary = 'No Conditional Access policy on this page targets device code with Block + Enabled.';
+                        if (allUserBlocks.length) {
+                            label = 'Protected';
+                            status = 'protected';
+                            summary = 'Enabled Block policies targeting device code for all users were found in this page.';
+                        } else if (enabledBlocks.length) {
+                            label = 'Partially protected';
+                            status = 'partial';
+                            summary = 'Device code is blocked for some scopes, but not clearly for all users on this page.';
+                        } else if (targeting.length) {
+                            summary = 'Policies target device code, but none are Enabled + Block on this page.';
+                        }
+                        showPosture({ status: status, label: label, summary: summary });
+                    }
+                }
                 nextLink = d.next_link || null;
                 if (d.total_count != null) {
                     sectionTotals[sectionId] = d.total_count;

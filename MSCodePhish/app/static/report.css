@@ -379,6 +379,44 @@ body.report-body {
     color: #027a48;
 }
 
+.report-posture {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--report-border);
+    background: #f8fafc;
+}
+
+.report-posture-label {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.report-posture-protected {
+    background: #ecfdf3;
+    border-color: #abefc6;
+    color: #027a48;
+}
+
+.report-posture-partial,
+.report-posture-report_only {
+    background: #fff8e6;
+    border-color: #fde68a;
+    color: #854d0e;
+}
+
+.report-posture-unprotected {
+    background: #fef3f2;
+    border-color: #fecdca;
+    color: #912018;
+}
+
+.report-posture-unavailable {
+    background: #f8fafc;
+    border-color: var(--report-border);
+    color: var(--report-muted);
+}
+
 .report-table-wrap {
     width: 100%;
     max-width: 100%;

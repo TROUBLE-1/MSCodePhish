@@ -227,6 +227,99 @@ def _build_chart_data(status_counts, account_counts, total, delivered, authorize
     }
 
 
+def _assess_device_code_posture(sessions):
+    """Best-effort CA posture using the first captured token with Graph access."""
+    token_id = None
+    for session in sessions or []:
+        if session.captured_token is not None:
+            token_id = session.captured_token.id
+            break
+    if not token_id:
+        return {
+            "status": "unavailable",
+            "label": "Not assessed",
+            "summary": "No captured token available to query Conditional Access policies.",
+            "error": None,
+        }
+    try:
+        from app.entra_enum import fetch_authentication_flows_posture
+        data, err = fetch_authentication_flows_posture(token_id)
+        if err or not data:
+            return {
+                "status": "unavailable",
+                "label": "Unable to assess",
+                "summary": err or "Could not evaluate Conditional Access authentication flows.",
+                "error": err,
+            }
+        posture = data.get("posture") or {}
+        return {
+            "status": posture.get("status") or "unavailable",
+            "label": posture.get("label") or "Unable to assess",
+            "summary": posture.get("summary") or "",
+            "learn_more": posture.get("learn_more"),
+            "detection_hint": posture.get("detection_hint"),
+            "targeting_count": posture.get("targeting_count"),
+            "enabled_block_count": posture.get("enabled_block_count"),
+            "enabled_block_policies": posture.get("enabled_block_policies") or [],
+            "error": None,
+        }
+    except Exception as exc:
+        return {
+            "status": "unavailable",
+            "label": "Unable to assess",
+            "summary": str(exc),
+            "error": str(exc),
+        }
+
+
+def _device_code_posture_recommendations(posture: dict) -> list:
+    status = (posture or {}).get("status")
+    learn = (posture or {}).get("learn_more") or (
+        "https://learn.microsoft.com/en-us/entra/identity/conditional-access/"
+        "policy-block-authentication-flows"
+    )
+    items = []
+    if status == "protected":
+        items.append(
+            "Tenant appears protected: an enabled Conditional Access policy blocks device code "
+            "for all users. Validate exclusions and keep monitoring for report-only gaps."
+        )
+    elif status == "partial":
+        items.append(
+            "Device code is only partially blocked. Expand Conditional Access Authentication flows "
+            f"→ Device code → Block to all users (with minimal break-glass exclusions). See {learn}"
+        )
+    elif status == "report_only":
+        items.append(
+            "Device code block policies are report-only. Review sign-in impact, then move them to "
+            f"Enabled. See {learn}"
+        )
+    elif status == "unprotected":
+        items.append(
+            "CRITICAL: No enabled Conditional Access policy blocks device code flow. Create a policy "
+            "under Conditions → Authentication flows → Device code → Grant → Block access. "
+            f"See {learn}"
+        )
+    else:
+        items.append(
+            "Enforce Conditional Access Authentication flows to block device code for users who do "
+            f"not explicitly require it. See {learn}"
+        )
+
+    items.append(
+        "Secondary risk: if device code remains allowed, attackers may use it to complete "
+        "Authenticator or passkey registration on a remote device."
+    )
+    items.append(
+        (posture or {}).get("detection_hint")
+        or (
+            "Monitor Entra sign-in logs for device code authentications and unexpected first-party "
+            "client IDs; alert on Authenticator/passkey registration soon after device-code sign-in."
+        )
+    )
+    return items
+
+
 def build_campaign_report(campaign, sessions=None, now=None):
     """Aggregate campaign metrics and rows for the assessment report."""
     now = now or datetime.utcnow()
@@ -314,10 +407,9 @@ def build_campaign_report(campaign, sessions=None, now=None):
         risk_class = "risk-medium"
 
     client_id = (campaign.public_client_id or "").strip()
-    recommendations = [
-        "Enforce Conditional Access policies that block or challenge device-code authentication from unmanaged devices.",
+    device_code_posture = _assess_device_code_posture(sessions)
+    recommendations = _device_code_posture_recommendations(device_code_posture) + [
         "Require phishing-resistant MFA (FIDO2 / Windows Hello for Business) for privileged and high-risk users.",
-        "Monitor sign-in logs for unfamiliar first-party client IDs (e.g. Azure CLI, PowerShell) used outside expected admin workflows.",
         "Educate users on Microsoft device-login prompts and verify app name shown during code entry.",
         "Restrict legacy authentication and review apps with offline_access / refresh token issuance.",
     ]
@@ -367,6 +459,7 @@ def build_campaign_report(campaign, sessions=None, now=None):
         "client_id": client_id,
         "client_name": _client_display_name(client_id),
         "recommendations": recommendations,
+        "device_code_posture": device_code_posture,
         "executive": executive,
         "charts": charts,
     }

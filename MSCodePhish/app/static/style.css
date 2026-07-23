@@ -1865,6 +1865,52 @@ table th {
     font-size: 0.9rem;
 }
 
+.token-enum-posture {
+    margin: 0.75rem 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border, #d8dee6);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.token-enum-posture-title {
+    display: block;
+    font-weight: 700;
+    font-size: 0.92rem;
+    margin: 0 0 0.35rem;
+}
+
+.token-enum-posture-summary {
+    display: block;
+    margin: 0;
+    opacity: 0.92;
+}
+
+.token-enum-posture-protected {
+    background: rgba(2, 122, 72, 0.12);
+    border-color: rgba(2, 122, 72, 0.35);
+    color: #7ddea8;
+}
+
+.token-enum-posture-partial,
+.token-enum-posture-report_only {
+    background: rgba(181, 71, 8, 0.12);
+    border-color: rgba(181, 71, 8, 0.35);
+    color: #f0c674;
+}
+
+.token-enum-posture-unprotected {
+    background: rgba(180, 35, 24, 0.12);
+    border-color: rgba(180, 35, 24, 0.35);
+    color: #f5a8a0;
+}
+
+.token-enum-posture-unavailable {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+}
+
 .token-enum-table-wrap {
     padding: 0 1rem;
 }

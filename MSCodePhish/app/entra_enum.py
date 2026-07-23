@@ -152,13 +152,14 @@ ENTRA_SECTIONS = [
         "path": "/identity/conditionalAccess/policies",
         "params": {
             "$top": "100",
-            "$select": "id,displayName,state,createdDateTime,modifiedDateTime",
+            "$select": "id,displayName,state,createdDateTime,modifiedDateTime,conditions,grantControls",
         },
         "columns": [
             {"key": "displayName", "label": "Name"},
             {"key": "state", "label": "State"},
-            {"key": "createdDateTime", "label": "Created"},
-            {"key": "modifiedDateTime", "label": "Modified"},
+            {"key": "targetsDeviceCode", "label": "Targets device code"},
+            {"key": "grantAction", "label": "Grant"},
+            {"key": "userScope", "label": "User scope"},
             {"key": "id", "label": "Policy ID"},
         ],
     },
@@ -176,6 +177,16 @@ ENTRA_SECTIONS = [
             {"key": "servicePrincipalType", "label": "Type"},
             {"key": "accountEnabled", "label": "Enabled"},
             {"key": "id", "label": "Object ID"},
+        ],
+    },
+    {
+        "id": "authentication-flows",
+        "label": "Authentication flows",
+        "kind": "settings",
+        "columns": [
+            {"key": "setting", "label": "Finding"},
+            {"key": "value", "label": "Status"},
+            {"key": "detail", "label": "Details"},
         ],
     },
     {
@@ -230,11 +241,280 @@ def _format_cell(value):
     return str(value)
 
 
+def _transfer_methods_include_device_code(methods) -> bool:
+    if methods is None:
+        return False
+    text = str(methods).lower().replace(" ", "").replace("_", "")
+    return "devicecodeflow" in text or "devicecode" in text
+
+
+def _policy_targets_device_code(policy: dict) -> bool:
+    conditions = policy.get("conditions") or {}
+    flows = conditions.get("authenticationFlows") or {}
+    return _transfer_methods_include_device_code(flows.get("transferMethods"))
+
+
+def _policy_grant_action(policy: dict) -> str:
+    grant = policy.get("grantControls") or {}
+    controls = [str(c).lower() for c in (grant.get("builtInControls") or [])]
+    if "block" in controls:
+        return "Block"
+    if controls:
+        return ", ".join(controls)
+    if grant.get("authenticationStrength") or grant.get("customAuthenticationFactors"):
+        return "Grant (strength/custom)"
+    return "-"
+
+
+def _policy_is_block(policy: dict) -> bool:
+    return _policy_grant_action(policy) == "Block"
+
+
+def _policy_user_scope(policy: dict) -> str:
+    users = ((policy.get("conditions") or {}).get("users")) or {}
+    include_users = users.get("includeUsers") or []
+    include_groups = users.get("includeGroups") or []
+    include_roles = users.get("includeRoles") or []
+    exclude_users = users.get("excludeUsers") or []
+    exclude_groups = users.get("excludeGroups") or []
+    exclude_roles = users.get("excludeRoles") or []
+
+    if "All" in include_users:
+        has_exclusions = bool(exclude_users or exclude_groups or exclude_roles)
+        return "All users (with exclusions)" if has_exclusions else "All users"
+
+    parts = []
+    if include_users:
+        parts.append(f"{len(include_users)} user(s)")
+    if include_groups:
+        parts.append(f"{len(include_groups)} group(s)")
+    if include_roles:
+        parts.append(f"{len(include_roles)} role(s)")
+    if not parts:
+        return "Scoped (see policy)"
+    return ", ".join(parts)
+
+
+def _policy_covers_all_users(policy: dict) -> bool:
+    users = ((policy.get("conditions") or {}).get("users")) or {}
+    include_users = users.get("includeUsers") or []
+    return "All" in include_users
+
+
+def analyze_device_code_ca_posture(policies: list) -> dict:
+    """Classify whether Conditional Access blocks device code flow."""
+    policies = policies or []
+    targeting = [p for p in policies if _policy_targets_device_code(p)]
+    enabled_blocks = [
+        p for p in targeting
+        if (p.get("state") or "").lower() == "enabled" and _policy_is_block(p)
+    ]
+    report_only_blocks = [
+        p for p in targeting
+        if (p.get("state") or "").lower() == "enabledforreportingbutnotenforced"
+        and _policy_is_block(p)
+    ]
+    enabled_all_user_blocks = [p for p in enabled_blocks if _policy_covers_all_users(p)]
+
+    if enabled_all_user_blocks:
+        status = "protected"
+        label = "Protected"
+        summary = (
+            "At least one enabled Conditional Access policy blocks device code flow for all users."
+        )
+    elif enabled_blocks:
+        status = "partial"
+        label = "Partially protected"
+        summary = (
+            "Device code flow is blocked for some users/groups, but not tenant-wide for all users."
+        )
+    elif report_only_blocks:
+        status = "report_only"
+        label = "Report-only only"
+        summary = (
+            "Device code block policies exist in report-only mode and are not yet enforced."
+        )
+    elif targeting:
+        status = "unprotected"
+        label = "Not protected"
+        summary = (
+            "Policies target device code flow but none both enable and block access."
+        )
+    else:
+        status = "unprotected"
+        label = "Not protected"
+        summary = (
+            "No Conditional Access policy targets the device code authentication flow."
+        )
+
+    def _policy_brief(p: dict) -> dict:
+        return {
+            "id": p.get("id"),
+            "displayName": p.get("displayName") or "(unnamed)",
+            "state": p.get("state") or "-",
+            "userScope": _policy_user_scope(p),
+            "grantAction": _policy_grant_action(p),
+        }
+
+    return {
+        "status": status,
+        "label": label,
+        "summary": summary,
+        "policy_count": len(policies),
+        "targeting_count": len(targeting),
+        "enabled_block_count": len(enabled_blocks),
+        "report_only_block_count": len(report_only_blocks),
+        "enabled_all_user_block_count": len(enabled_all_user_blocks),
+        "targeting_policies": [_policy_brief(p) for p in targeting],
+        "enabled_block_policies": [_policy_brief(p) for p in enabled_blocks],
+        "learn_more": (
+            "https://learn.microsoft.com/en-us/entra/identity/conditional-access/"
+            "policy-block-authentication-flows"
+        ),
+        "detection_hint": (
+            "In Entra sign-in logs, filter for device code authentications and correlate with "
+            "unexpected first-party client IDs. Watch for Authenticator/passkey registration "
+            "shortly after a device-code sign-in."
+        ),
+    }
+
+
+def _authentication_flows_rows(posture: dict) -> list:
+    targeting = posture.get("targeting_policies") or []
+    enabled_blocks = posture.get("enabled_block_policies") or []
+    targeting_names = ", ".join(p.get("displayName") for p in targeting[:5]) or "None"
+    if len(targeting) > 5:
+        targeting_names += f" (+{len(targeting) - 5} more)"
+    block_names = ", ".join(p.get("displayName") for p in enabled_blocks[:5]) or "None"
+    if len(enabled_blocks) > 5:
+        block_names += f" (+{len(enabled_blocks) - 5} more)"
+
+    return [
+        {
+            "setting": "Device code flow CA posture",
+            "value": posture.get("label") or "-",
+            "detail": posture.get("summary") or "",
+        },
+        {
+            "setting": "CA policies targeting device code",
+            "value": str(posture.get("targeting_count") or 0),
+            "detail": targeting_names,
+        },
+        {
+            "setting": "Enabled policies that block device code",
+            "value": str(posture.get("enabled_block_count") or 0),
+            "detail": block_names,
+        },
+        {
+            "setting": "Report-only device code block policies",
+            "value": str(posture.get("report_only_block_count") or 0),
+            "detail": (
+                "Move report-only policies to Enabled after validating impact."
+                if posture.get("report_only_block_count")
+                else "No report-only device code block policies found."
+            ),
+        },
+        {
+            "setting": "Recommended control",
+            "value": "Block authentication flows → Device code",
+            "detail": posture.get("learn_more") or "",
+        },
+        {
+            "setting": "Detection guidance",
+            "value": "Sign-in logs",
+            "detail": posture.get("detection_hint") or "",
+        },
+        {
+            "setting": "Secondary risk",
+            "value": "Passkey / Authenticator enrollment",
+            "detail": (
+                "If device code remains allowed, it can be abused to complete "
+                "Authenticator or passkey registration on a remote device."
+            ),
+        },
+    ]
+
+
+def _fetch_conditional_access_policies(access_token: str) -> list:
+    policies = []
+    url = f"{GRAPH_BASE}/identity/conditionalAccess/policies"
+    params = {
+        "$top": "100",
+        "$select": "id,displayName,state,createdDateTime,modifiedDateTime,conditions,grantControls",
+    }
+    headers = _graph_headers(access_token)
+    while url:
+        resp = requests.get(url, headers=headers, params=params, timeout=45)
+        params = None
+        if resp.status_code >= 400:
+            try:
+                body = resp.json()
+                msg = body.get("error", {}).get("message") or body.get("error_description") or resp.text
+            except Exception:
+                msg = resp.text or f"Graph API error {resp.status_code}"
+            raise RuntimeError(msg)
+        payload = resp.json()
+        policies.extend(payload.get("value") or [])
+        url = payload.get("@odata.nextLink")
+    return policies
+
+
+def fetch_authentication_flows_posture(captured_token_id, client_id=None, access_token_override=None):
+    """Assess whether the tenant blocks device code via Conditional Access."""
+    cfg = _section_config("authentication-flows")
+    override = _enum_access_token_override(access_token_override)
+
+    if override:
+        access_token = override
+        effective_client, client_name = resolve_enum_client(captured_token_id, client_id)
+    else:
+        access_token, effective_client, client_name, err = _get_enum_access_token(
+            captured_token_id, client_id
+        )
+        if err:
+            return None, err
+
+    if not access_token:
+        return None, "No access token available"
+
+    try:
+        policies = _fetch_conditional_access_policies(access_token)
+    except requests.RequestException as exc:
+        return None, str(exc)
+    except RuntimeError as exc:
+        return None, str(exc)
+
+    posture = analyze_device_code_ca_posture(policies)
+    rows = _authentication_flows_rows(posture)
+    count = len(rows)
+
+    return {
+        "ok": True,
+        "section": cfg["id"],
+        "label": cfg["label"],
+        "kind": "settings",
+        "columns": cfg["columns"],
+        "rows": rows,
+        "count": count,
+        "total_count": count,
+        "next_link": None,
+        "client_id": effective_client,
+        "client_name": client_name,
+        "scope": DEFAULT_ENUM_SCOPE,
+        "token_source": "custom" if override else "refresh",
+        "posture": posture,
+    }, None
+
+
 def _normalize_row(item: dict, section_id: str) -> dict:
     row = dict(item)
     if section_id == "licenses":
         prepaid = item.get("prepaidUnits") or {}
         row["enabledUnits"] = prepaid.get("enabled")
+    if section_id == "conditional-access":
+        row["targetsDeviceCode"] = "Yes" if _policy_targets_device_code(item) else "No"
+        row["grantAction"] = _policy_grant_action(item)
+        row["userScope"] = _policy_user_scope(item)
     return row
 
 
@@ -383,6 +663,10 @@ def _fetch_section_total(access_token: str, cfg: dict) -> int:
         if section_id == "security-configuration":
             policy = _fetch_authorization_policy(access_token)
             return len(_security_configuration_rows(policy))
+        if section_id == "authentication-flows":
+            policies = _fetch_conditional_access_policies(access_token)
+            posture = analyze_device_code_ca_posture(policies)
+            return len(_authentication_flows_rows(posture))
         return 0
 
     params = dict(cfg.get("params") or {})
@@ -458,10 +742,16 @@ def fetch_entra_section(
     override = _enum_access_token_override(access_token_override)
     if cfg.get("kind") == "settings":
         if next_link:
-            return None, "Pagination is not supported for security configuration"
-        return fetch_security_configuration(
-            captured_token_id, client_id=client_id, access_token_override=override
-        )
+            return None, "Pagination is not supported for settings sections"
+        if section_id == "authentication-flows":
+            return fetch_authentication_flows_posture(
+                captured_token_id, client_id=client_id, access_token_override=override
+            )
+        if section_id == "security-configuration":
+            return fetch_security_configuration(
+                captured_token_id, client_id=client_id, access_token_override=override
+            )
+        return None, f"Unsupported settings section: {section_id}"
 
     if override:
         access_token = override

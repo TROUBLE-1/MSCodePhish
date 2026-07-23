@@ -186,6 +186,26 @@
         </section>
 
         <section class="report-section">
+            <h2>Device code Conditional Access posture</h2>
+            {% set posture = report.device_code_posture or {} %}
+            <div class="report-posture report-posture-{{ posture.status or 'unavailable' }}">
+                <div class="report-posture-label">{{ posture.label or 'Not assessed' }}</div>
+                <p class="report-prose" style="margin:0.5rem 0 0;">{{ posture.summary or 'Posture was not evaluated for this report.' }}</p>
+            </div>
+            {% if posture.enabled_block_policies %}
+            <h3 class="report-subheading">Enabled device-code block policies</h3>
+            <ul class="report-findings">
+                {% for p in posture.enabled_block_policies %}
+                <li><strong>{{ p.displayName }}</strong> — {{ p.userScope }} ({{ p.state }})</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if posture.learn_more %}
+            <p class="report-prose"><a href="{{ posture.learn_more }}" target="_blank" rel="noopener noreferrer">Microsoft Learn: Block authentication flows</a></p>
+            {% endif %}
+        </section>
+
+        <section class="report-section">
             <h2>Findings - successful authentications</h2>
             {% if report.authorized_rows %}
             <div class="report-table-wrap app-scroll">
