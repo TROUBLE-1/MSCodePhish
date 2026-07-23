@@ -1,7 +1,8 @@
-# MSCodePhish
+<img width="800" height="800" alt="download-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/62ec3f3b-7a88-4901-a562-51d6413816a8" /># MSCodePhish
 
 <p align="center">
-   <img src="MSCodePhish/app/static/images/mscodephish_logo.png" width="300px" alt="ROADtools logo" />
+   <img width="400" height="400" src="https://github.com/user-attachments/assets/bc360cc6-f6bc-4074-bab3-fcb35b25a660" />
+
 </p>
 
 MSCodePhish is a red‑team toolkit that turns Microsoft’s Device Code OAuth flow into an embeddable phishing primitive that works inside any lure (e.g., “grab your coupon,” “unlock access,” etc.). Instead of pre‑generating device codes and racing against the usual 15‑minute timeout, MSCodePhish exposes a simple API endpoint that phishing pages can call via JavaScript (XHR/fetch) at the exact moment a victim opens the page. The tool then generates a fresh device code on demand, returns it to the phishing page (e.g., rendered as a “coupon code”), and instructs the user to complete the login on the legitimate Microsoft device login portal using that code.
