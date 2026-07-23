@@ -1,4 +1,4 @@
-<img width="800" height="800" alt="download-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/62ec3f3b-7a88-4901-a562-51d6413816a8" /># MSCodePhish
+# MSCodePhish
 
 <p align="center">
    <img width="400" height="400" src="https://github.com/user-attachments/assets/bc360cc6-f6bc-4074-bab3-fcb35b25a660" />
