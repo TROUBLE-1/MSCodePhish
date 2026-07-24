@@ -1,6 +1,7 @@
 # MSCodePhish
 
 <p align="center">
+   <!-- <img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/3deb2d0c-4b45-4b48-a330-5ddd537e77fc" /> -->
    <img width="400" height="400" src="https://github.com/user-attachments/assets/bc360cc6-f6bc-4074-bab3-fcb35b25a660" />
 
 </p>
